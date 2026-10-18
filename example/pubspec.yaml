@@ -1,0 +1,14 @@
+name: sea_glass_example
+description: Sea Glass sample.
+publish_to: none
+version: 1.0.0
+environment:
+  sdk: ^3.6.0
+  flutter: ">=3.27.0"
+dependencies:
+  flutter:
+    sdk: flutter
+  sea_glass:
+    path: ../
+flutter:
+  uses-material-design: true

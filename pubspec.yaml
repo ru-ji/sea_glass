@@ -1,0 +1,21 @@
+name: sea_glass
+description: Frosted, softly tumbled glass material for Flutter. A port of the Sea Glass material (Material 3 concept) with seeded outlines, frost, curved colored interior and transmitted light.
+version: 0.1.0
+repository: https://github.com/mttmcknn/sea-glass
+
+environment:
+  sdk: ^3.6.0
+  flutter: ">=3.27.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  shaders:
+    - shaders/sea_glass.frag
