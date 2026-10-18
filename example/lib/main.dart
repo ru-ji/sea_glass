@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'pages/pill_page.dart';
 import 'pages/playground_page.dart';
 import 'pages/quick_settings_page.dart';
+import 'promo/promo_scene.dart';
 
 void main() => runApp(const SeaGlassExampleApp());
 
@@ -40,7 +41,7 @@ class _ExampleHomeState extends State<ExampleHome> {
       body: IndexedStack(
         index: page,
         sizing: StackFit.expand,
-        children: const [QuickSettingsPage(), PillPage(), PlaygroundPage()],
+        children: const [QuickSettingsPage(), PillPage(), PlaygroundPage(), PromoPage()],
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: page,
@@ -49,6 +50,7 @@ class _ExampleHomeState extends State<ExampleHome> {
           NavigationDestination(icon: Icon(Icons.tune), label: 'Quick settings'),
           NavigationDestination(icon: Icon(Icons.smart_button_outlined), label: 'Pill'),
           NavigationDestination(icon: Icon(Icons.science_outlined), label: 'Playground'),
+          NavigationDestination(icon: Icon(Icons.movie_outlined), label: 'Promo'),
         ],
       ),
     );

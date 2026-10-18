@@ -109,6 +109,11 @@ repeated pieces also draw immediately.
 - **Pill**: a single large glass pill.
 - **Playground**: recipes, palettes, Material 3 colors and live sliders.
 
+- **Promo**: an 8 s vertical presentation loop.
+
+`example/tool/render_promo.sh` renders the promo frame by frame with the real shader and assembles
+`doc/promo/sea_glass_promo.mp4` (720 × 1280, 30 fps) with ffmpeg.
+
 `example/test/screenshot_test.dart` renders each page with the real shader and regenerates
 `doc/screenshots/`.
 

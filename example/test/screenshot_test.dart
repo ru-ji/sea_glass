@@ -6,27 +6,12 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sea_glass/sea_glass.dart';
 import 'package:sea_glass_example/main.dart';
 import 'package:sea_glass_example/pages/pill_page.dart';
 
-Future<void> loadFonts() async {
-  final root = File(Platform.resolvedExecutable).parent.parent.parent.parent.parent.parent.path;
-  final fonts = Directory('$root/bin/cache/artifacts/material_fonts');
-  Future<void> load(String family, List<String> files) async {
-    final loader = FontLoader(family);
-    for (final f in files) {
-      final file = File('${fonts.path}/$f');
-      if (file.existsSync()) loader.addFont(Future.value(ByteData.sublistView(file.readAsBytesSync())));
-    }
-    await loader.load();
-  }
-
-  await load('Roboto', ['Roboto-Regular.ttf', 'Roboto-Medium.ttf', 'Roboto-Bold.ttf', 'Roboto-Light.ttf']);
-  await load('MaterialIcons', ['MaterialIcons-Regular.otf']);
-}
+import 'fonts.dart';
 
 void main() {
   setUpAll(loadFonts);
