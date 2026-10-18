@@ -105,4 +105,24 @@ void main() {
     expect(taps, 1);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('padding and alignment place the child; the glass fills the box', (tester) async {
+    await tester.pumpWidget(const Directionality(
+      textDirection: TextDirection.ltr,
+      child: Center(
+        child: SeaGlass(
+          width: 200,
+          height: 50,
+          alignment: Alignment.centerRight,
+          padding: EdgeInsets.only(right: 8),
+          clipChild: true,
+          child: SizedBox(width: 20, height: 20),
+        ),
+      ),
+    ));
+    final paint = find.descendant(of: find.byType(SeaGlass), matching: find.byType(CustomPaint)).first;
+    expect(tester.getSize(paint), const Size(200, 50));
+    expect(tester.getSize(find.byType(ClipPath)), const Size(200, 50));
+    expect(tester.getTopRight(find.byType(SizedBox).last).dx, tester.getTopRight(paint).dx - 8);
+  });
 }

@@ -60,7 +60,8 @@ class Diff {
   String toString() => 'max=${max.toStringAsExponential(3)} mean=${mean.toStringAsExponential(3)} over=$over/$count';
 }
 
-Future<Uint8List> renderBody(Case c, ui.Image a, ui.Image b, double gradA, double gradB, ui.FragmentProgram program) async {
+Future<Uint8List> renderBody(Case c, ui.Image a, ui.Image b, double gradA, double gradB, ui.FragmentProgram program,
+    {Offset offset = Offset.zero}) async {
   final shader = program.fragmentShader();
   configureBodyShader(
     shader, a, b,
@@ -71,11 +72,13 @@ Future<Uint8List> renderBody(Case c, ui.Image a, ui.Image b, double gradA, doubl
     body: Color(0xFF000000 | c.i('body')), edge: Color(0xFF000000 | c.i('edge')),
   );
   final recorder = ui.PictureRecorder();
-  Canvas(recorder).drawPath(contourToPath(c.segments), Paint()
-    ..isAntiAlias = true
-    ..shader = shader);
+  Canvas(recorder)
+    ..translate(offset.dx, offset.dy)
+    ..drawPath(contourToPath(c.segments), Paint()
+      ..isAntiAlias = true
+      ..shader = shader);
   final picture = recorder.endRecording();
-  final image = await picture.toImage(c.i('pixelWidth'), c.i('pixelHeight'));
+  final image = await picture.toImage(c.i('pixelWidth') + offset.dx.toInt(), c.i('pixelHeight') + offset.dy.toInt());
   final data = (await image.toByteData(format: ui.ImageByteFormat.rawRgba))!;
   return data.buffer.asUint8List();
 }
@@ -150,6 +153,33 @@ void main() {
         // ignore: avoid_print
         print('${c.id} body (Kotlin textures): interior $interior | all $all');
         expect(all.over, 0, reason: 'all $all');
+      });
+
+      testWidgets('shading uses local coordinates (drawn at an offset)', (tester) async {
+        // Fragment coordinates must follow the canvas transform, as they do for
+        // the reference's local shader coordinates.
+        const offset = Offset(23, 11);
+        final program = await tester.runAsync(SeaGlassShaderProgram.load);
+        final w = c.i('textureWidth'), h = c.i('textureHeight');
+        final pixels = (await tester.runAsync(() async {
+          final a = await uploadFloatTexture(c.floats('a.f32'), w, h);
+          final b = await uploadFloatTexture(c.floats('b.f32'), w, h);
+          return renderBody(c, a, b, f32(c.n('gradientScaleA')), f32(c.n('gradientScaleB')), program!, offset: offset);
+        }))!;
+        final pw = c.i('pixelWidth'), ph = c.i('pixelHeight'), stride = pw + offset.dx.toInt();
+        final expected = c.bytes('body.rgba');
+        final d = Diff();
+        for (var y = 0; y < ph; y++) {
+          for (var x = 0; x < pw; x++) {
+            final i = (y * pw + x) * 4, j = ((y + offset.dy.toInt()) * stride + x + offset.dx.toInt()) * 4;
+            // Interior only: moving a path can shift edge antialiasing slightly.
+            if (expected[i + 3] != 255 || pixels[j + 3] != 255) continue;
+            for (var ch = 0; ch < 4; ch++) {
+              d.add(pixels[j + ch], expected[i + ch]);
+            }
+          }
+        }
+        expect(d.over, 0, reason: '$d');
       });
 
       testWidgets('ground light matches the Kotlin/Skia ground', (tester) async {

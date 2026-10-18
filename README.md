@@ -5,6 +5,14 @@ Frosted, softly tumbled glass for Flutter — a port of the **Sea Glass** materi
 Seeded organic outlines, microscopic frost, a curved coloured interior, a luminous lower edge
 and soft transmitted light beneath each piece. Text and icons stay normal widgets.
 
+<p align="center">
+  <img src="doc/screenshots/quick_settings.png" width="260" alt="Quick Settings panel made of frosted and teal sea glass tiles" />
+  <img src="doc/screenshots/pill.png" width="260" alt="A large teal glass pill with a glowing lower edge" />
+  <img src="doc/screenshots/playground.png" width="260" alt="Playground with recipes, palettes and sliders" />
+</p>
+
+Requires Flutter 3.41 or later, the first release where Impeller accepts float32 textures.
+
 ```dart
 SeaGlassButton(
   onPressed: compose,
@@ -74,5 +82,14 @@ repeated pieces also draw immediately.
   differently from the Skia software renderer used by `flutter test`.
 
 - The material paints up to 48 px outside its layout box; avoid clipping ancestors.
+
+## Example
+`example/` contains three pages:
+- **Quick settings**: an Android-style panel with toggle tiles and a glass brightness slider.
+- **Pill**: a single large glass pill.
+- **Playground**: recipes, palettes, Material 3 colors and live sliders.
+
+`example/test/screenshot_test.dart` renders each page with the real shader and regenerates
+`doc/screenshots/`.
 
 Credit: material design and shader math by [mttmcknn/sea-glass](https://github.com/mttmcknn/sea-glass); see its license.

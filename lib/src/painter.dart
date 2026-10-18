@@ -22,7 +22,12 @@ class SeaGlassShaderProgram {
   static ui.FragmentProgram? _program;
   static Future<ui.FragmentProgram?>? _loading;
 
+  static bool _failed = false;
+
   static ui.FragmentProgram? get loaded => _program;
+
+  /// True once loading finished without a usable program.
+  static bool get failed => _failed;
 
   static Future<ui.FragmentProgram?> load() => _loading ??= () async {
         // The package-relative key applies inside this package's own tests.
@@ -31,7 +36,8 @@ class SeaGlassShaderProgram {
             return _program = await ui.FragmentProgram.fromAsset(key);
           } catch (_) {}
         }
-        debugPrint('sea_glass: shader unavailable');
+        debugPrint('sea_glass: shader unavailable, drawing a flat fallback');
+        _failed = true;
         return null;
       }();
 }
@@ -100,6 +106,9 @@ class SeaGlassGeometryCache {
     final g = await (_building[key] ??= SeaGlassGeometryController._build(key)
       ..whenComplete(() => _building.remove(key)));
     if (g == null) return null;
+    // Every awaiter of a shared build gets its own handle before eviction can
+    // dispose the cached entry.
+    final handle = g.clone();
     if (!_entries.containsKey(key)) {
       _entries[key] = g;
       _bytes += g.byteSize;
@@ -110,7 +119,7 @@ class SeaGlassGeometryCache {
         evicted.dispose();
       }
     }
-    return lookup(key) ?? g.clone();
+    return handle;
   }
 
   /// Releases every cached geometry. Live pieces keep their own handles.
@@ -126,11 +135,16 @@ class SeaGlassGeometryCache {
 /// Owns one piece's geometry (port of LiveMaterialRenderer's update model):
 /// the last complete geometry stays visible while edits are prepared off the
 /// paint path; one build is active and only the newest request is kept pending.
+/// It also owns the piece's reusable shader and its rasterized ground light.
 class SeaGlassGeometryController extends ChangeNotifier {
   LiveGeometry? _displayed;
-  GeometryKey? _active, _pending;
+  GeometryKey? _active, _pending, _latest;
+  final Set<GeometryKey> _failed = {};
   bool _disposed = false;
   final Map<GeometryKey, Path> _paths = {};
+  ui.FragmentProgram? _shaderProgram;
+  ui.FragmentShader? _shader;
+  _GroundImage? _ground;
 
   static GeometryKey keyFor(Size size, SeaGlassShape shape, SeaGlassStyle style) {
     final fieldScale = math.min(1.0, math.sqrt(262144.0 / (size.width * size.height)));
@@ -150,18 +164,28 @@ class SeaGlassGeometryController extends ChangeNotifier {
   static Path _outline(GeometryKey k) => contourToPath(
       contourSegments(buildContour(k.widthDp, k.heightDp, shape: k.shape, tumble: k.tumble, seed: k.seed)));
 
+  /// The last complete geometry, whatever its size.
+  LiveGeometry? get displayed => _displayed;
+
   LiveGeometry? displayedFor(Size size) {
     final d = _displayed;
     return d != null && d.key.sameSize(size) ? d : null;
   }
 
+  /// Whether building this geometry failed (for example, no float textures).
+  bool failedFor(Size size, SeaGlassShape shape, SeaGlassStyle style) =>
+      _failed.contains(keyFor(size, shape, style));
+
   void request(Size size, SeaGlassShape shape, SeaGlassStyle style) {
     if (size.width < 1 || size.height < 1) return;
     final key = keyFor(size, shape, style);
+    _latest = key;
     if (_displayed?.key == key || _active == key) {
       _pending = null;
       return;
     }
+    // A failed key is not retried on every repaint.
+    if (_failed.contains(key)) return;
     // Cached geometry applies synchronously, during this paint.
     final cached = SeaGlassGeometryCache.lookup(key);
     if (cached != null) {
@@ -184,16 +208,54 @@ class SeaGlassGeometryController extends ChangeNotifier {
         g?.dispose();
         return;
       }
-      if (g != null) {
+      _active = null;
+      if (g == null) {
+        _failed.add(key);
+      } else if (g.key == _latest || _displayed?.key != _latest) {
         _displayed?.dispose();
         _displayed = g;
+      } else {
+        // A -> B(active) -> A keeps A: the latest request is already shown.
+        g.dispose();
       }
-      _active = null;
       final next = _pending;
       _pending = null;
-      if (next != null && next != _displayed?.key) _start(next);
+      if (next != null && next != _displayed?.key && !_failed.contains(next)) _start(next);
       notifyListeners();
     });
+  }
+
+  /// One shader per piece; only its uniforms change between frames.
+  ui.FragmentShader shaderFor(ui.FragmentProgram program) {
+    if (_shaderProgram != program) {
+      _shader?.dispose();
+      _shader = program.fragmentShader();
+      _shaderProgram = program;
+    }
+    return _shader!;
+  }
+
+  /// The three blurred ground layers, rasterized once per input change (like
+  /// RealtimeGround's recorded layers) instead of re-blurred every frame.
+  ui.Image groundFor(Path path, Size size, SeaGlassStyle s, SeaGlassPalette palette, double pixelRatio) {
+    final key = _GroundKey(path, size, s.thickness, s.bulge, s.frost, s.elevation, s.transmission,
+        palette.body.toARGB32() & 0xFFFFFF, pixelRatio);
+    final cached = _ground;
+    if (cached != null && cached.key == key) return cached.image;
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder)
+      ..scale(pixelRatio)
+      ..translate(kSeaGlassPadding, kSeaGlassPadding);
+    paintGround(canvas, path, size, s, palette);
+    final picture = recorder.endRecording();
+    final image = picture.toImageSync(
+      ((size.width + kSeaGlassPadding * 2) * pixelRatio).ceil(),
+      ((size.height + kSeaGlassPadding * 2) * pixelRatio).ceil(),
+    );
+    picture.dispose();
+    cached?.image.dispose();
+    _ground = _GroundImage(key, image);
+    return image;
   }
 
   static Future<LiveGeometry?> _build(GeometryKey k) async {
@@ -226,8 +288,37 @@ class SeaGlassGeometryController extends ChangeNotifier {
     _disposed = true;
     _displayed?.dispose();
     _displayed = null;
+    _shader?.dispose();
+    _ground?.image.dispose();
     super.dispose();
   }
+}
+
+@immutable
+class _GroundKey {
+  const _GroundKey(this.path, this.size, this.thickness, this.bulge, this.frost, this.elevation,
+      this.transmission, this.body, this.pixelRatio);
+  final Path path;
+  final Size size;
+  final double thickness, bulge, frost, elevation, transmission, pixelRatio;
+  final int body;
+
+  @override
+  bool operator ==(Object other) =>
+      other is _GroundKey && identical(other.path, path) && other.size == size &&
+      other.thickness == thickness && other.bulge == bulge && other.frost == frost &&
+      other.elevation == elevation && other.transmission == transmission &&
+      other.body == body && other.pixelRatio == pixelRatio;
+
+  @override
+  int get hashCode => Object.hash(identityHashCode(path), size, thickness, bulge, frost, elevation,
+      transmission, body, pixelRatio);
+}
+
+class _GroundImage {
+  _GroundImage(this.key, this.image);
+  final _GroundKey key;
+  final ui.Image image;
 }
 
 /// Paints the three ground-light layers and the glass body.
@@ -238,6 +329,7 @@ class SeaGlassPainter extends CustomPainter {
     required this.shape,
     required this.controller,
     this.program,
+    this.devicePixelRatio = 1.0,
   }) : super(repaint: controller);
 
   final SeaGlassStyle style;
@@ -246,22 +338,47 @@ class SeaGlassPainter extends CustomPainter {
   final SeaGlassGeometryController controller;
   final ui.FragmentProgram? program;
 
+  /// Resolution of the cached ground-light image.
+  final double devicePixelRatio;
+
   @override
   void paint(Canvas canvas, Size size) {
     if (size.width < 1 || size.height < 1) return;
     final s = style.normalized();
+    final p = program;
+    if (p == null || controller.failedFor(size, shape, s)) {
+      // Without a shader (or float textures) draw a flat body instead of
+      // nothing; while the shader is still loading, draw nothing yet.
+      if (SeaGlassShaderProgram.failed || p != null) _paintFlat(canvas, size, s);
+      return;
+    }
     controller.request(size, shape, s);
-    final geometry = controller.displayedFor(size);
-    // Like the reference, never show a partial piece: ground and body appear
-    // together once this size's geometry exists. A displayed geometry keeps its
-    // own seed and tumble while a newer one is prepared.
-    if (geometry == null || program == null) return;
-    paintGround(canvas, geometry.path, size, s, palette);
-    _paintBody(canvas, size, s, geometry, program!);
+    final exact = controller.displayedFor(size);
+    final geometry = exact ?? controller.displayed;
+    // Never show a partial piece: ground and body appear together. While a
+    // resized geometry is prepared, the previous one is stretched to fit, so
+    // animated sizes do not blink; it keeps its own seed and tumble.
+    if (geometry == null) return;
+    final own = Size(geometry.key.widthDp, geometry.key.heightDp);
+    canvas.save();
+    if (exact == null) canvas.scale(size.width / own.width, size.height / own.height);
+    _drawGround(canvas, controller.groundFor(geometry.path, own, s, palette, devicePixelRatio), own);
+    _paintBody(canvas, s, geometry, p);
+    canvas.restore();
   }
 
-  void _paintBody(Canvas canvas, Size size, SeaGlassStyle s, LiveGeometry g, ui.FragmentProgram p) {
-    final shader = p.fragmentShader();
+  void _drawGround(Canvas canvas, ui.Image image, Size size) {
+    canvas.drawImageRect(
+      image,
+      Rect.fromLTWH(0, 0, image.width.toDouble(), image.height.toDouble()),
+      Rect.fromLTWH(-kSeaGlassPadding, -kSeaGlassPadding,
+          image.width / devicePixelRatio, image.height / devicePixelRatio),
+      Paint()..filterQuality = FilterQuality.low,
+    );
+  }
+
+  void _paintBody(Canvas canvas, SeaGlassStyle s, LiveGeometry g, ui.FragmentProgram p) {
+    final shader = controller.shaderFor(p);
     configureBodyShader(
       shader, g.a, g.b,
       widthDp: g.key.widthDp, heightDp: g.key.heightDp, fieldScale: g.key.fieldScale,
@@ -274,10 +391,21 @@ class SeaGlassPainter extends CustomPainter {
       ..shader = shader);
   }
 
+  void _paintFlat(Canvas canvas, Size size, SeaGlassStyle s) {
+    final path = controller.pathFor(size, shape, s);
+    paintGround(canvas, path, size, s, palette);
+    canvas.drawPath(path, Paint()
+      ..isAntiAlias = true
+      ..shader = ui.Gradient.linear(Offset.zero, Offset(0, size.height),
+          [Color.lerp(palette.body, const Color(0xFFFFFFFF), .25)!, palette.body, palette.edge],
+          const [0.0, 0.7, 1.0]));
+  }
+
   @override
   bool shouldRepaint(SeaGlassPainter old) =>
       style != old.style || palette != old.palette || shape != old.shape ||
-      program != old.program || controller != old.controller;
+      program != old.program || controller != old.controller ||
+      devicePixelRatio != old.devicePixelRatio;
 }
 
 /// Clips children to the displayed tumbled outline.
@@ -324,8 +452,10 @@ Future<ui.Image> uploadFloatTexture(Float32List data, int width, int height) {
     rounded[i] = halfToFloat(float16Bits(data[i]));
   }
   final done = Completer<ui.Image>();
-  ui.decodeImageFromPixels(rounded.buffer.asUint8List(),
-      width, height, ui.PixelFormat.rgbaFloat32, done.complete);
+  // Request a float texture explicitly: with the default (dontCare) a backend
+  // may store 8-bit channels, which would quantize the encoded gradients.
+  ui.decodeImageFromPixels(rounded.buffer.asUint8List(), width, height, ui.PixelFormat.rgbaFloat32,
+      done.complete, targetFormat: ui.TargetPixelFormat.rgbaFloat32);
   return done.future;
 }
 

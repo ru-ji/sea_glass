@@ -4,7 +4,7 @@ publish_to: none
 version: 1.0.0
 environment:
   sdk: ^3.6.0
-  flutter: ">=3.27.0"
+  flutter: ">=3.41.0"
 dependencies:
   flutter:
     sdk: flutter
@@ -12,3 +12,6 @@ dependencies:
     path: ../
 flutter:
   uses-material-design: true
+dev_dependencies:
+  flutter_test:
+    sdk: flutter

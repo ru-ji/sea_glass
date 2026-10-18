@@ -3,4 +3,4 @@ library;
 
 export 'src/style.dart';
 export 'src/theme.dart';
-export 'src/widgets.dart' show SeaGlass, SeaGlassSurface, SeaGlassButton, SeaGlassDecoration;
+export 'src/widgets.dart' show SeaGlass, SeaGlassSurface, SeaGlassButton;

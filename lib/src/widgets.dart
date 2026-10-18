@@ -29,14 +29,6 @@ mixin _GlassState<T extends StatefulWidget> on State<T> {
   }
 }
 
-/// Describes the glass look of one piece. Used by widgets and for manual painting.
-class SeaGlassDecoration {
-  const SeaGlassDecoration({this.style, this.palette, this.shape});
-  final SeaGlassStyle? style;
-  final SeaGlassPalette? palette;
-  final SeaGlassShape? shape;
-}
-
 /// Draws the glass material behind [child]. Adds no padding or interaction.
 /// The material paints up to ~48 logical pixels outside the layout box
 /// (shadow and transmitted light); avoid clipping ancestors where possible.
@@ -97,17 +89,22 @@ class _SeaGlassState extends State<SeaGlass> with _GlassState {
     if (content != null && widget.padding != null) {
       content = Padding(padding: widget.padding!, child: content);
     }
+    if (content != null && widget.alignment != null) {
+      content = Align(alignment: widget.alignment!, child: content);
+    }
+    // The material, and the clip, always cover the whole box: padding and
+    // alignment only place the child inside it.
     if (content != null && widget.clipChild) {
       content = ClipPath(clipper: SeaGlassClipper(cache, style, shape), child: content);
     }
-    return Container(
+    return SizedBox(
       width: widget.width,
       height: widget.height,
-      alignment: widget.alignment,
       child: CustomPaint(
         painter: SeaGlassPainter(
-            style: style, palette: palette, shape: shape, controller: cache, program: program),
-        child: content,
+            style: style, palette: palette, shape: shape, controller: cache, program: program,
+            devicePixelRatio: MediaQuery.maybeDevicePixelRatioOf(context) ?? 1.0),
+        child: content ?? const SizedBox.expand(),
       ),
     );
   }
@@ -250,6 +247,7 @@ class _SeaGlassButtonState extends State<SeaGlassButton> with _GlassState {
     Widget glass = CustomPaint(
       painter: SeaGlassPainter(
         style: style, palette: palette, shape: shape, controller: cache, program: program,
+        devicePixelRatio: MediaQuery.maybeDevicePixelRatioOf(context) ?? 1.0,
       ),
       child: Center(widthFactor: 1, heightFactor: 1, child: content),
     );
@@ -286,6 +284,7 @@ class _SeaGlassButtonState extends State<SeaGlassButton> with _GlassState {
         },
         child: GestureDetector(
           behavior: HitTestBehavior.opaque,
+          excludeFromSemantics: true,
           onTapDown: _enabled ? (_) => _setPressed(true) : null,
           onTapUp: _enabled ? (_) => _setPressed(false) : null,
           onTapCancel: _enabled ? () => _setPressed(false) : null,
