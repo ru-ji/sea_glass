@@ -9,6 +9,7 @@ import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
+import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/painting.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sea_glass/sea_glass.dart';
@@ -61,14 +62,14 @@ class Diff {
 }
 
 Future<Uint8List> renderBody(Case c, ui.Image a, ui.Image b, double gradA, double gradB, ui.FragmentProgram program,
-    {Offset offset = Offset.zero}) async {
+    {Offset offset = Offset.zero, SeaGlassStyle? style}) async {
   final shader = program.fragmentShader();
   configureBodyShader(
     shader, a, b,
     widthDp: c.n('width'), heightDp: c.n('height'), fieldScale: f32(c.n('fieldScale')),
     gradientScaleA: gradA, gradientScaleB: gradB,
     textureWidth: c.i('textureWidth'), textureHeight: c.i('textureHeight'),
-    style: c.style.normalized(), seed: c.i('seed'),
+    style: (style ?? c.style).normalized(), seed: c.i('seed'),
     body: Color(0xFF000000 | c.i('body')), edge: Color(0xFF000000 | c.i('edge')),
   );
   final recorder = ui.PictureRecorder();
@@ -227,4 +228,95 @@ void main() {
       });
     });
   }
+
+  group('shadow direction (extension)', () {
+    final c = cases.firstWhere((c) => c.id == 'lagoon-rounded');
+
+    Future<Uint8List> ground(WidgetTester tester, double degrees, {double? transmission}) async {
+      final w = c.n('width'), h = c.n('height');
+      final pw = (w + kSeaGlassPadding * 2).ceil(), ph = (h + kSeaGlassPadding * 2).ceil();
+      return (await tester.runAsync(() async {
+        final recorder = ui.PictureRecorder();
+        final canvas = Canvas(recorder)..translate(kSeaGlassPadding, kSeaGlassPadding);
+        paintGround(canvas, contourToPath(c.segments), Size(w, h), c.style.copyWith(shadowDegrees: degrees, transmission: transmission).normalized(),
+            const SeaGlassPalette(body: Color(0xFFB5D0EB), edge: Color(0xFFD6E9FF), ink: Color(0xFF000000)));
+        final image = await recorder.endRecording().toImage(pw, ph);
+        return (await image.toByteData(format: ui.ImageByteFormat.rawRgba))!.buffer.asUint8List();
+      }))!;
+    }
+
+    /// Alpha-weighted centroid of the ground light, relative to the body center.
+    Offset centroid(Uint8List rgba) {
+      final pw = (c.n('width') + kSeaGlassPadding * 2).ceil();
+      var sx = 0.0, sy = 0.0, sum = 0.0;
+      for (var i = 0; i < rgba.length ~/ 4; i++) {
+        final a = rgba[i * 4 + 3].toDouble();
+        sx += a * (i % pw);
+        sy += a * (i ~/ pw);
+        sum += a;
+      }
+      return Offset(sx / sum - kSeaGlassPadding - c.n('width') / 2, sy / sum - kSeaGlassPadding - c.n('height') / 2);
+    }
+
+    testWidgets('the default (180) is exactly the reference ground', (tester) async {
+      final pixels = await ground(tester, 180);
+      final expected = c.bytes('ground.rgba');
+      final d = Diff();
+      for (var i = 0; i < expected.length; i++) {
+        d.add(pixels[i], expected[i], 3);
+      }
+      expect(d.over, 0, reason: '$d');
+    });
+
+    testWidgets('ground light falls along the chosen direction', (tester) async {
+      for (final (degrees, expectDir) in [(180.0, const Offset(0, 1)), (90.0, const Offset(1, 0)),
+          (0.0, const Offset(0, -1)), (270.0, const Offset(-1, 0))]) {
+        final m = centroid(await ground(tester, degrees));
+        final dir = m / m.distance;
+        expect(dir.dx, closeTo(expectDir.dx, .08), reason: '$degrees° centroid $m');
+        expect(dir.dy, closeTo(expectDir.dy, .08), reason: '$degrees° centroid $m');
+        expect(m.distance, greaterThan(2), reason: '$degrees° centroid $m');
+      }
+      // Shadows alone (no transmitted pool) are offset exactly along a diagonal.
+      for (final (degrees, expectDir) in [(135.0, const Offset(.7071, .7071)), (315.0, const Offset(-.7071, -.7071))]) {
+        final m = centroid(await ground(tester, degrees, transmission: 0));
+        final dir = m / m.distance;
+        expect(dir.dx, closeTo(expectDir.dx, .08), reason: '$degrees° centroid $m');
+        expect(dir.dy, closeTo(expectDir.dy, .08), reason: '$degrees° centroid $m');
+        expect(m.distance, greaterThan(2), reason: '$degrees° centroid $m');
+      }
+    });
+
+    testWidgets('the luminous exit edge follows the direction', (tester) async {
+      final program = await tester.runAsync(SeaGlassShaderProgram.load);
+      final w = c.i('textureWidth'), h = c.i('textureHeight');
+      Future<Uint8List> body(double degrees) async => (await tester.runAsync(() async {
+            final a = await uploadFloatTexture(c.floats('a.f32'), w, h);
+            final b = await uploadFloatTexture(c.floats('b.f32'), w, h);
+            return renderBody(c, a, b, f32(c.n('gradientScaleA')), f32(c.n('gradientScaleB')), program!,
+                style: c.style.copyWith(shadowDegrees: degrees));
+          }))!;
+      final pw = c.i('pixelWidth'), ph = c.i('pixelHeight');
+      double band(Uint8List px, bool top) {
+        var sum = 0.0, n = 0;
+        final rows = top ? [for (var y = 4; y < ph * .2; y++) y] : [for (var y = (ph * .8).ceil(); y < ph - 4; y++) y];
+        for (final y in rows) {
+          for (var x = (pw * .3).round(); x < pw * .7; x++) {
+            final i = (y * pw + x) * 4;
+            if (px[i + 3] != 255) continue;
+            sum += px[i] + px[i + 1] + px[i + 2];
+            n++;
+          }
+        }
+        return sum / n;
+      }
+
+      final down = await body(180), up = await body(0);
+      // Default is unchanged from the reference.
+      expect(listEquals(down, c.bytes('body.rgba')), isTrue);
+      // The light exits at the edge the ground light falls toward.
+      expect(band(down, false), greaterThan(band(down, true)));
+      expect(band(up, true), greaterThan(band(up, false)));
+    });
+  });
 }

@@ -19,12 +19,12 @@ class _PlaygroundPageState extends State<PlaygroundPage> {
   };
   String palette = 'Lagoon';
   bool materialYou = false;
-  double tumble = .025, frost = .55, light = 315;
+  double tumble = .025, frost = .55, light = 315, shadow = 180;
 
   @override
   Widget build(BuildContext context) {
     final glass = materialYou ? SeaGlassPalette.of(context) : palettes[palette]!;
-    final style = SeaGlassStyle.reference.copyWith(tumble: tumble, frost: frost, lightDegrees: light);
+    final style = SeaGlassStyle.reference.copyWith(tumble: tumble, frost: frost, lightDegrees: light, shadowDegrees: shadow);
     return Material(
       color: const Color(0xFFF7F4EF),
       child: SafeArea(
@@ -77,6 +77,7 @@ class _PlaygroundPageState extends State<PlaygroundPage> {
           _slider('Tumble', tumble, .065, (v) => tumble = v),
           _slider('Frost', frost, 1, (v) => frost = v),
           _slider('Light', light, 360, (v) => light = v),
+          _slider('Shadow', shadow, 360, (v) => shadow = v),
         ]),
       ),
     );

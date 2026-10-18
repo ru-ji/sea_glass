@@ -74,6 +74,13 @@ void main() {
     expect(p.ink, scheme.onSecondaryContainer);
   });
 
+  test('shadowDegrees defaults to down and takes part in equality', () {
+    expect(const SeaGlassStyle().shadowDegrees, 180);
+    expect(SeaGlassStyle.reference.copyWith(shadowDegrees: 90).shadowDegrees, 90);
+    expect(SeaGlassStyle.reference.copyWith(shadowDegrees: 90), isNot(SeaGlassStyle.reference));
+    expect(const SeaGlassStyle(shadowDegrees: double.nan).normalized().shadowDegrees, 180);
+  });
+
   test('style clamps out-of-range values', () {
     final s = const SeaGlassStyle(frost: 4, tumble: 1, thickness: 99, elevation: -3).normalized();
     expect(s.frost, 1);

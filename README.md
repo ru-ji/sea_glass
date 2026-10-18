@@ -29,6 +29,18 @@ SeaGlassButton(
 - `SeaGlassTheme` – inheritable defaults (`style`, `palette`, `shape`); nested themes override only what they set.
 - `SeaGlassComponentStyle` – style + palette + shape bundle for design systems.
 
+## Shadow direction
+`shadowDegrees` sets where the ground light falls: 180 is down (the default and the original's
+fixed direction), 90 is right, 0 is up. The cast and contact shadows, the colored transmitted pool
+and the body's luminous exit edge follow it together. It is independent of `lightDegrees`, which
+only moves surface reflections. At 180 the output is bit-identical to the original.
+
+```dart
+SeaGlassStyle.reference.copyWith(shadowDegrees: 135) // down-right
+```
+
+<p align="center"><img src="doc/screenshots/shadow_directions.png" width="260" alt="The same pill with its shadow falling down, right, down-right, left and up" /></p>
+
 ## Recipes and palettes
 `SeaGlassStyle.reference / tumbled / quiet`, or `copyWith(frost, grain, tumble, thickness, bulge, elevation, lightDegrees, transmission, seed)`.
 Palettes: `lagoon, lilac, rose, amber, mint`. Shapes: `rounded, capsule, disc`.

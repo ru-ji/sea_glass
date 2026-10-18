@@ -1,6 +1,6 @@
 name: sea_glass
 description: Frosted, softly tumbled glass material for Flutter. A port of the Sea Glass material (Material 3 concept) with seeded outlines, frost, curved colored interior and transmitted light.
-version: 0.1.1
+version: 0.2.0
 repository: https://github.com/mttmcknn/sea-glass
 
 environment:

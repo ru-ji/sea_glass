@@ -10,6 +10,14 @@ import 'material_field.dart';
 import 'random.dart';
 import 'style.dart';
 
+/// Unit vector for a ground-light direction in degrees (180 = down). Values
+/// within rounding of an axis are snapped, so 180 gives exactly (0, 1).
+Offset shadowVector(double degrees) {
+  final theta = degrees * math.pi / 180.0;
+  double snap(double v) => v.abs() < 1e-9 ? 0.0 : (v - v.sign).abs() < 1e-9 ? v.sign : v;
+  return Offset(snap(math.sin(theta)), snap(-math.cos(theta)));
+}
+
 /// Transparent gutter the material may draw into outside its layout box.
 const double kSeaGlassPadding = 48.0;
 
@@ -239,7 +247,7 @@ class SeaGlassGeometryController extends ChangeNotifier {
   /// RealtimeGround's recorded layers) instead of re-blurred every frame.
   ui.Image groundFor(Path path, Size size, SeaGlassStyle s, SeaGlassPalette palette, double pixelRatio) {
     final key = _GroundKey(path, size, s.thickness, s.bulge, s.frost, s.elevation, s.transmission,
-        palette.body.toARGB32() & 0xFFFFFF, pixelRatio);
+        palette.body.toARGB32() & 0xFFFFFF, pixelRatio, s.shadowDegrees);
     final cached = _ground;
     if (cached != null && cached.key == key) return cached.image;
     final recorder = ui.PictureRecorder();
@@ -297,10 +305,10 @@ class SeaGlassGeometryController extends ChangeNotifier {
 @immutable
 class _GroundKey {
   const _GroundKey(this.path, this.size, this.thickness, this.bulge, this.frost, this.elevation,
-      this.transmission, this.body, this.pixelRatio);
+      this.transmission, this.body, this.pixelRatio, this.shadowDegrees);
   final Path path;
   final Size size;
-  final double thickness, bulge, frost, elevation, transmission, pixelRatio;
+  final double thickness, bulge, frost, elevation, transmission, pixelRatio, shadowDegrees;
   final int body;
 
   @override
@@ -308,11 +316,11 @@ class _GroundKey {
       other is _GroundKey && identical(other.path, path) && other.size == size &&
       other.thickness == thickness && other.bulge == bulge && other.frost == frost &&
       other.elevation == elevation && other.transmission == transmission &&
-      other.body == body && other.pixelRatio == pixelRatio;
+      other.body == body && other.pixelRatio == pixelRatio && other.shadowDegrees == shadowDegrees;
 
   @override
   int get hashCode => Object.hash(identityHashCode(path), size, thickness, bulge, frost, elevation,
-      transmission, body, pixelRatio);
+      transmission, body, pixelRatio, shadowDegrees);
 }
 
 class _GroundImage {
@@ -502,6 +510,12 @@ void configureBodyShader(
   f(((e >> 16) & 255) / 255); f(((e >> 8) & 255) / 255); f((e & 255) / 255); // edgeColor
   f(lx); f(ly); // lightDirection
   f(halfX / halfLength); f(halfY / halfLength); f(halfZ / halfLength); // halfway
+  final d = shadowVector(s.shadowDegrees);
+  f(d.dx); f(d.dy); // shadowDirection
+  // shadowSpan: the minimum of dot(p / size, d) over the unit box and its
+  // extent. For 180 degrees this is (0, 1), reproducing position.y / height.
+  f(math.min(0.0, d.dx) + math.min(0.0, d.dy));
+  f(d.dx.abs() + d.dy.abs());
 }
 
 final ByteData _bits = ByteData(4);
@@ -549,12 +563,14 @@ void paintGround(Canvas canvas, Path path, Size size, SeaGlassStyle s, SeaGlassP
   // Compose converts these float alphas to 8-bit color with rounding.
   Color argb(double alpha, int rgb) => Color(((f32(alpha) * 255).round() << 24) | rgb);
 
+  final direction = shadowVector(s.shadowDegrees);
+
   void layer(double offset, double sigma, Paint paint) {
     canvas.saveLayer(
       bounds,
       Paint()..imageFilter = ui.ImageFilter.blur(sigmaX: sigma, sigmaY: sigma, tileMode: TileMode.decal),
     );
-    canvas.translate(0, offset);
+    canvas.translate(direction.dx * offset, direction.dy * offset);
     canvas.drawPath(path, paint..isAntiAlias = true);
     canvas.restore();
   }
@@ -578,12 +594,25 @@ void paintGround(Canvas canvas, Path path, Size size, SeaGlassStyle s, SeaGlassP
       math.min(22.0, s.thickness * 0.42 + travel),
       math.min(8.0, 2.8 + short * 0.033 + s.frost * 1.6),
       Paint()
+        // The opacity ramp runs across the body along the ground-light
+        // direction; for 180 degrees this is top (0) to bottom (height).
         ..shader = ui.Gradient.linear(
-          Offset.zero,
-          Offset(0, size.height),
+          _spanPoint(direction, 0),
+          _spanPoint(direction, 1),
           [argb(0, tintRgb), argb(t * 0.06, tintRgb), argb(t * 0.48, tintRgb), argb(t * 0.94, tintRgb)],
           const [0.0, 0.45, 0.75, 1.0],
+          TileMode.clamp,
+          // Unit-box coordinates scaled to the body, like the shader's travel.
+          Matrix4.diagonal3Values(size.width, size.height, 1).storage,
         ),
     );
   }
+}
+
+/// The point of the unit box where the projection on [direction] is at
+/// fraction [t] of its range, on the center line ((0.5, 0) to (0.5, 1) for
+/// 180°). A diagonal direction therefore runs corner to corner.
+Offset _spanPoint(Offset direction, double t) {
+  final extent = direction.dx.abs() + direction.dy.abs();
+  return const Offset(0.5, 0.5) + direction * ((t - 0.5) * extent);
 }

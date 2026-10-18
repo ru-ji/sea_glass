@@ -1,3 +1,9 @@
+## 0.2.0
+- `SeaGlassStyle.shadowDegrees` (default 180, down): direction of the cast and contact shadows, the
+  transmitted color pool and the body's luminous exit edge. An extension of the original, which
+  always casts downward; at 180 the output is unchanged and bit-identical to it.
+- Example: Shadow slider in the Playground and a shadow-directions screenshot.
+
 ## 0.1.1
 - Require Flutter 3.41 and request float32 geometry textures explicitly; the default target format
   could store 8-bit channels on Impeller.

@@ -13,6 +13,7 @@ class SeaGlassStyle {
     this.lightDegrees = 315,
     this.transmission = 0.58,
     this.seed = 42,
+    this.shadowDegrees = 180,
   });
 
   /// Cloudiness, 0..1.
@@ -42,6 +43,13 @@ class SeaGlassStyle {
   /// Stable piece identity. Keep it constant across rebuilds.
   final int seed;
 
+  /// Direction the ground light falls, in degrees: 180 is down (the
+  /// reference's fixed direction), 90 is right, 0 is up. The cast and contact
+  /// shadows, the transmitted color pool and the body's luminous exit edge all
+  /// follow it. Independent of [lightDegrees], which moves surface reflections.
+  /// This is an extension: the original always casts downward.
+  final double shadowDegrees;
+
   static const SeaGlassStyle reference = SeaGlassStyle();
   static const SeaGlassStyle tumbled = SeaGlassStyle(
     frost: .72, grain: .68, tumble: .055, thickness: 9,
@@ -55,7 +63,7 @@ class SeaGlassStyle {
   SeaGlassStyle copyWith({
     double? frost, double? grain, double? tumble, double? thickness,
     double? bulge, double? elevation, double? lightDegrees,
-    double? transmission, int? seed,
+    double? transmission, int? seed, double? shadowDegrees,
   }) =>
       SeaGlassStyle(
         frost: frost ?? this.frost,
@@ -67,6 +75,7 @@ class SeaGlassStyle {
         lightDegrees: lightDegrees ?? this.lightDegrees,
         transmission: transmission ?? this.transmission,
         seed: seed ?? this.seed,
+        shadowDegrees: shadowDegrees ?? this.shadowDegrees,
       );
 
   /// The same recipe with every field clamped to its documented range.
@@ -80,6 +89,7 @@ class SeaGlassStyle {
         lightDegrees: _finite(lightDegrees, 315),
         transmission: _finite(transmission, .58).clamp(0.0, 1.0),
         seed: seed,
+        shadowDegrees: _finite(shadowDegrees, 180),
       );
 
   static double _finite(double v, double fallback) => v.isFinite ? v : fallback;
@@ -90,11 +100,12 @@ class SeaGlassStyle {
       frost == other.frost && grain == other.grain && tumble == other.tumble &&
       thickness == other.thickness && bulge == other.bulge &&
       elevation == other.elevation && lightDegrees == other.lightDegrees &&
-      transmission == other.transmission && seed == other.seed;
+      transmission == other.transmission && seed == other.seed &&
+      shadowDegrees == other.shadowDegrees;
 
   @override
   int get hashCode => Object.hash(frost, grain, tumble, thickness, bulge,
-      elevation, lightDegrees, transmission, seed);
+      elevation, lightDegrees, transmission, seed, shadowDegrees);
 }
 
 enum SeaGlassShape { rounded, capsule, disc }
