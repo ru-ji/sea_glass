@@ -14,6 +14,7 @@ class SeaGlassStyle {
     this.transmission = 0.58,
     this.seed = 42,
     this.shadowDegrees = 180,
+    this.shadowTinted = false,
   });
 
   /// Cloudiness, 0..1.
@@ -45,10 +46,15 @@ class SeaGlassStyle {
 
   /// Direction the ground light falls, in degrees: 180 is down (the
   /// reference's fixed direction), 90 is right, 0 is up. The cast and contact
-  /// shadows, the transmitted color pool and the body's luminous exit edge all
-  /// follow it. Independent of [lightDegrees], which moves surface reflections.
-  /// This is an extension: the original always casts downward.
+  /// shadows and the transmitted color pool follow it; the glass body itself
+  /// is unchanged. Independent of [lightDegrees], which moves surface
+  /// reflections. This is an extension: the original always casts downward.
   final double shadowDegrees;
+
+  /// Tint the cast and contact shadows with the body pigment (at 40%
+  /// brightness) instead of the reference's neutral gray. Extension; off by
+  /// default.
+  final bool shadowTinted;
 
   static const SeaGlassStyle reference = SeaGlassStyle();
   static const SeaGlassStyle tumbled = SeaGlassStyle(
@@ -63,7 +69,7 @@ class SeaGlassStyle {
   SeaGlassStyle copyWith({
     double? frost, double? grain, double? tumble, double? thickness,
     double? bulge, double? elevation, double? lightDegrees,
-    double? transmission, int? seed, double? shadowDegrees,
+    double? transmission, int? seed, double? shadowDegrees, bool? shadowTinted,
   }) =>
       SeaGlassStyle(
         frost: frost ?? this.frost,
@@ -76,6 +82,7 @@ class SeaGlassStyle {
         transmission: transmission ?? this.transmission,
         seed: seed ?? this.seed,
         shadowDegrees: shadowDegrees ?? this.shadowDegrees,
+        shadowTinted: shadowTinted ?? this.shadowTinted,
       );
 
   /// The same recipe with every field clamped to its documented range.
@@ -90,6 +97,7 @@ class SeaGlassStyle {
         transmission: _finite(transmission, .58).clamp(0.0, 1.0),
         seed: seed,
         shadowDegrees: _finite(shadowDegrees, 180),
+        shadowTinted: shadowTinted,
       );
 
   static double _finite(double v, double fallback) => v.isFinite ? v : fallback;
@@ -101,11 +109,11 @@ class SeaGlassStyle {
       thickness == other.thickness && bulge == other.bulge &&
       elevation == other.elevation && lightDegrees == other.lightDegrees &&
       transmission == other.transmission && seed == other.seed &&
-      shadowDegrees == other.shadowDegrees;
+      shadowDegrees == other.shadowDegrees && shadowTinted == other.shadowTinted;
 
   @override
   int get hashCode => Object.hash(frost, grain, tumble, thickness, bulge,
-      elevation, lightDegrees, transmission, seed, shadowDegrees);
+      elevation, lightDegrees, transmission, seed, shadowDegrees, shadowTinted);
 }
 
 enum SeaGlassShape { rounded, capsule, disc }

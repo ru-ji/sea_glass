@@ -9,11 +9,6 @@ precision highp float;
 //  - float2/3/4 -> vec2/3/4; half4 main(coordinates) -> main() writing fragColor.
 //  - `uniform shader` -> sampler2D. SkSL eval(texelCoords) becomes
 //    texture(sampler, texelCoords / geometrySize), so geometrySize was added.
-//  - Extension (not in the original): the ground-light direction. Terms tied
-//    to "down" use dot(v, shadowDirection) instead of v.y, and the vertical
-//    travel is measured along it in normalized box coordinates (shadowSpan).
-//    With the default direction (0, 1) and span (0, 1) every expression
-//    evaluates exactly as the original.
 // Uniform order matters: Flutter sets floats by index (see painter.dart).
 
 uniform sampler2D geometryA;
@@ -29,8 +24,6 @@ uniform vec3 bodyColor;
 uniform vec3 edgeColor;
 uniform vec2 lightDirection;
 uniform vec3 halfway;
-uniform vec2 shadowDirection; // unit vector the ground light falls along
-uniform vec2 shadowSpan;      // min of dot(p / size, dir) over the unit box, and its extent
 
 out vec4 fragColor;
 
@@ -98,11 +91,11 @@ void main() {
     shapeNormal.z = clamp(shapeNormal.z, 0.0, 1.0);
     float rough = grain * (0.025 + frost * 0.04);
     vec3 normal = normalize(vec3(-slope * rise + roughGradient * rough, 1.0));
-    float travel = clamp((dot(position / materialSize, shadowDirection) - shadowSpan.x) / shadowSpan.y, 0.0, 1.0);
+    float travel = clamp(position.y / materialSize.y, 0.0, 1.0);
     float flow = travel * travel * (3.0 - 2.0 * travel);
     float depth = (1.05 - flow * transmission * 0.13)
         * (0.70 + dome * (0.52 + thickness * 0.012))
-        * (1.0 + (1.0 - shapeNormal.z) * max(0.0, -dot(shapeNormal.xy, shadowDirection)) * 0.28)
+        * (1.0 + (1.0 - shapeNormal.z) * max(0.0, -shapeNormal.y) * 0.28)
         * (1.0 + cloud * 0.035);
     float weathering = frost * (0.06 + (cloud + 1.0) * 0.025);
     vec3 tint = bodyColor * 0.96 + edgeColor * 0.04;
@@ -124,14 +117,14 @@ void main() {
     float reflection = exp(-(acrossScale * acrossScale + alongScale * alongScale))
         * clamp(reflectedLight / 0.30, 0.0, 1.0) * (0.15 + bulge * 0.12) * (0.82 + frost * 0.18);
     float scatter = pow(max(0.0, dot(normal, halfway)), 12.0 + (1.0 - frost) * 18.0) * (0.008 + frost * 0.012);
-    float upperScale = (dot(normal.xy, shadowDirection) + 0.40) / 0.38;
+    float upperScale = (normal.y + 0.40) / 0.38;
     float upperTurn = exp(-(upperScale * upperScale)) * pow(max(normal.z, 0.000001), 0.55)
         * (0.10 + bulge * 0.14) * (0.85 + frost * 0.15);
     float palePits = pow(max(0.0, roughness + 0.20), 2.0) * grain
         * (5.0 + frost * 10.0) * (0.65 + diffuse * 0.35);
     float matte = roughness * grain * (0.012 + frost * 0.016);
     float grazing = sqrt(max(0.0, 1.0 - shapeNormal.z * shapeNormal.z));
-    float lowerFacing = clamp((dot(shapeNormal.xy, shadowDirection) + 0.16) / 0.80, 0.0, 1.0);
+    float lowerFacing = clamp((shapeNormal.y + 0.16) / 0.80, 0.0, 1.0);
     float shoulder = pow(grazing, 2.3) * lowerFacing * lowerFacing * (3.0 - 2.0 * lowerFacing);
     float exitAmount = clamp(transmission * (0.10 * flow + 1.65 * shoulder)
         * (0.96 - thickness * 0.005), 0.0, 0.96);

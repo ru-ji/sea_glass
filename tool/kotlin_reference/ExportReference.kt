@@ -27,6 +27,7 @@ import org.jetbrains.skia.Shader
 import kotlin.math.roundToInt
 import org.jetbrains.skia.Image
 import org.jetbrains.skia.ImageInfo
+import org.jetbrains.skia.Matrix33
 import org.jetbrains.skia.Paint
 import org.jetbrains.skia.Path
 import org.jetbrains.skia.RuntimeEffect
@@ -137,6 +138,12 @@ fun main(args: Array<String>) {
         surface.canvas.drawPath(skiaPath(g.segments, 1.0), Paint().apply { shader = builder.makeShader(); isAntiAlias = true })
         File(dir, "body.rgba").writeBytes(pixels(surface, pw, ph))
         File(dir, "ground.rgba").writeBytes(renderGround(c, g.segments))
+        if (c.id == "lagoon-rounded" || c.id == "mint-disc") {
+            for ((degrees, tinted) in GROUND_VARIANTS) {
+                val name = "ground-${degrees.toInt()}" + (if (tinted) "-tinted" else "") + ".rgba"
+                File(dir, name).writeBytes(renderGroundExtended(c, g.segments, degrees, tinted))
+            }
+        }
         val shapeName = c.shape.name.lowercase()
         index.append("""  {"id":"${c.id}","width":${c.w},"height":${c.h},"shape":"$shapeName",""")
             .append(""""frost":${s.frost},"grain":${s.grain},"tumble":${s.tumble},"thickness":${s.thickness},"bulge":${s.bulge},"elevation":${s.elevation},"light":${s.light},"transmission":${s.transmission},"seed":${s.seed},""")
@@ -196,6 +203,88 @@ internal fun renderGround(c: Case, segments: List<ContourSegment>): ByteArray {
                 argb((transmission * 0.48).toFloat(), tintRgb), argb((transmission * 0.94).toFloat(), tintRgb)),
             floatArrayOf(0f, 0.45f, 0.75f, 1f),
             GradientStyle.DEFAULT,
+        )
+        layer(
+            offsetDp = min(22.0, settings.thickness * 0.42 + travel),
+            sigmaDp = min(8.0, 2.8 + short * 0.033 + settings.frost * 1.6),
+            paint = Paint().apply { shader = gradient },
+        )
+    }
+    return pixels(surface, pw, ph)
+}
+
+/** Extension variants exported for the Flutter port: (shadowDegrees, tinted). */
+internal val GROUND_VARIANTS = listOf(
+    90.0 to false, 135.0 to false, 0.0 to false, 270.0 to false, 180.0 to true, 135.0 to true,
+)
+
+/** Unit vector for a ground-light direction (180 = down), axis values snapped. */
+internal fun shadowVector(degrees: Double): Pair<Double, Double> {
+    val theta = degrees * PI / 180.0
+    fun snap(v: Double) = if (kotlin.math.abs(v) < 1e-9) 0.0 else if (kotlin.math.abs(v - kotlin.math.sign(v)) < 1e-9) kotlin.math.sign(v) else v
+    return snap(sin(theta)) to snap(-cos(theta))
+}
+
+/**
+ * The Flutter port's extension, applied to the original RealtimeGround code
+ * path above (same layers, offsets, sigmas, alphas and Skia blur):
+ *  - every layer offset runs along shadowVector(shadowDegrees) instead of +y;
+ *  - the transmission ramp runs along that direction across the unit box,
+ *    scaled to the body (for 180 this is the original top-to-bottom ramp);
+ *  - tinted: the cast and contact shadows use the body pigment at 40%
+ *    brightness instead of the neutral 0x3F4342 / 0x3D413F.
+ */
+internal fun renderGroundExtended(c: Case, segments: List<ContourSegment>, shadowDegrees: Double, tinted: Boolean): ByteArray {
+    val settings = c.settings.normalized()
+    val palette = c.palette
+    val widthDp = c.w
+    val heightDp = c.h
+    val pad = MATERIAL_PADDING_DP.toFloat()
+    val pw = ceil(widthDp + MATERIAL_PADDING_DP * 2.0).toInt()
+    val ph = ceil(heightDp + MATERIAL_PADDING_DP * 2.0).toInt()
+    val surface = rgbaSurface(pw, ph)
+    val canvas = surface.canvas
+    val path = skiaPath(segments, 1.0)
+    val short = min(widthDp, heightDp)
+    val transmission = settings.transmission
+    val (dx, dy) = shadowVector(shadowDegrees)
+    fun layer(offsetDp: Double, sigmaDp: Double, paint: Paint) {
+        val layerPaint = Paint().apply { imageFilter = ImageFilter.makeBlur(sigmaDp.toFloat(), sigmaDp.toFloat(), FilterTileMode.DECAL) }
+        canvas.saveLayer(Rect.makeWH(pw.toFloat(), ph.toFloat()), layerPaint)
+        canvas.translate(pad, pad)
+        canvas.translate((dx * offsetDp).toFloat(), (dy * offsetDp).toFloat())
+        canvas.drawPath(path, paint.apply { isAntiAlias = true })
+        canvas.restore()
+    }
+    fun argb(alpha: Float, rgb: Int) = ((alpha * 255f).roundToInt() shl 24) or rgb
+    fun shadowRgb(neutral: Int): Int {
+        if (!tinted) return neutral
+        fun dim(channel: Int) = (channel * 0.4).roundToInt().coerceIn(0, 255)
+        return (dim((palette.body ushr 16) and 255) shl 16) or (dim((palette.body ushr 8) and 255) shl 8) or dim(palette.body and 255)
+    }
+    layer(
+        offsetDp = min(16.0, settings.thickness * 0.40 + settings.elevation * 0.72 + settings.bulge * short * 0.03),
+        sigmaDp = min(6.0, 2.5 + settings.elevation * 0.18 + settings.frost * 0.7 + settings.bulge * short * 0.018),
+        paint = Paint().apply { color = argb(((0.18 + settings.elevation * 0.001) * (1.0 - transmission * 0.82)).toFloat(), shadowRgb(0x3F4342)) },
+    )
+    layer(
+        offsetDp = min(8.0, settings.thickness * 0.32 + 0.8),
+        sigmaDp = 1.4 + settings.elevation * 0.065,
+        paint = Paint().apply { color = argb((0.10 * (1.0 - transmission * 0.70)).toFloat(), shadowRgb(0x3D413F)) },
+    )
+    if (transmission > 0.001) {
+        val travel = 4.0 + settings.elevation * 0.56 + short * 0.055
+        fun tint(channel: Int): Int = (255.0 - (255 - channel) * 1.35).roundToInt().coerceIn(0, 255)
+        val tintRgb = (tint((palette.body ushr 16) and 255) shl 16) or
+            (tint((palette.body ushr 8) and 255) shl 8) or tint(palette.body and 255)
+        val extent = kotlin.math.abs(dx) + kotlin.math.abs(dy)
+        val gradient = Shader.makeLinearGradient(
+            (0.5 - dx * 0.5 * extent).toFloat(), (0.5 - dy * 0.5 * extent).toFloat(),
+            (0.5 + dx * 0.5 * extent).toFloat(), (0.5 + dy * 0.5 * extent).toFloat(),
+            intArrayOf(argb(0f, tintRgb), argb((transmission * 0.06).toFloat(), tintRgb),
+                argb((transmission * 0.48).toFloat(), tintRgb), argb((transmission * 0.94).toFloat(), tintRgb)),
+            floatArrayOf(0f, 0.45f, 0.75f, 1f),
+            GradientStyle(FilterTileMode.CLAMP, false, Matrix33.makeScale(widthDp.toFloat(), heightDp.toFloat())),
         )
         layer(
             offsetDp = min(22.0, settings.thickness * 0.42 + travel),

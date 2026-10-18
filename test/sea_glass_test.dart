@@ -79,6 +79,9 @@ void main() {
     expect(SeaGlassStyle.reference.copyWith(shadowDegrees: 90).shadowDegrees, 90);
     expect(SeaGlassStyle.reference.copyWith(shadowDegrees: 90), isNot(SeaGlassStyle.reference));
     expect(const SeaGlassStyle(shadowDegrees: double.nan).normalized().shadowDegrees, 180);
+    expect(const SeaGlassStyle().shadowTinted, isFalse);
+    expect(SeaGlassStyle.reference.copyWith(shadowTinted: true), isNot(SeaGlassStyle.reference));
+    expect(SeaGlassStyle.reference.copyWith(shadowTinted: true).normalized().shadowTinted, isTrue);
   });
 
   test('style clamps out-of-range values', () {

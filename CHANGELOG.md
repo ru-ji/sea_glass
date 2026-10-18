@@ -1,8 +1,12 @@
 ## 0.2.0
-- `SeaGlassStyle.shadowDegrees` (default 180, down): direction of the cast and contact shadows, the
-  transmitted color pool and the body's luminous exit edge. An extension of the original, which
-  always casts downward; at 180 the output is unchanged and bit-identical to it.
-- Example: Shadow slider in the Playground and a shadow-directions screenshot.
+- `SeaGlassStyle.shadowDegrees` (default 180, down) sets the direction of the cast and contact
+  shadows and the transmitted color pool.
+- `SeaGlassStyle.shadowTinted` (default false) tints the cast and contact shadows with the body
+  pigment.
+- Both are extensions of the original and affect only the ground light; the glass body shader is
+  the original's. With the defaults the output is unchanged. Each variant is tested against the
+  Kotlin exporter, which applies the same extension to the original ground code path.
+- Example: Shadow slider and Tinted shadow switch in the Playground, and a shadow screenshot.
 
 ## 0.1.1
 - Require Flutter 3.41 and request float32 geometry textures explicitly; the default target format

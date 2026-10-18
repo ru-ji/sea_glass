@@ -247,7 +247,7 @@ class SeaGlassGeometryController extends ChangeNotifier {
   /// RealtimeGround's recorded layers) instead of re-blurred every frame.
   ui.Image groundFor(Path path, Size size, SeaGlassStyle s, SeaGlassPalette palette, double pixelRatio) {
     final key = _GroundKey(path, size, s.thickness, s.bulge, s.frost, s.elevation, s.transmission,
-        palette.body.toARGB32() & 0xFFFFFF, pixelRatio, s.shadowDegrees);
+        palette.body.toARGB32() & 0xFFFFFF, pixelRatio, s.shadowDegrees, s.shadowTinted);
     final cached = _ground;
     if (cached != null && cached.key == key) return cached.image;
     final recorder = ui.PictureRecorder();
@@ -305,22 +305,24 @@ class SeaGlassGeometryController extends ChangeNotifier {
 @immutable
 class _GroundKey {
   const _GroundKey(this.path, this.size, this.thickness, this.bulge, this.frost, this.elevation,
-      this.transmission, this.body, this.pixelRatio, this.shadowDegrees);
+      this.transmission, this.body, this.pixelRatio, this.shadowDegrees, this.shadowTinted);
   final Path path;
   final Size size;
   final double thickness, bulge, frost, elevation, transmission, pixelRatio, shadowDegrees;
   final int body;
+  final bool shadowTinted;
 
   @override
   bool operator ==(Object other) =>
       other is _GroundKey && identical(other.path, path) && other.size == size &&
       other.thickness == thickness && other.bulge == bulge && other.frost == frost &&
       other.elevation == elevation && other.transmission == transmission &&
-      other.body == body && other.pixelRatio == pixelRatio && other.shadowDegrees == shadowDegrees;
+      other.body == body && other.pixelRatio == pixelRatio && other.shadowDegrees == shadowDegrees &&
+      other.shadowTinted == shadowTinted;
 
   @override
   int get hashCode => Object.hash(identityHashCode(path), size, thickness, bulge, frost, elevation,
-      transmission, body, pixelRatio, shadowDegrees);
+      transmission, body, pixelRatio, shadowDegrees, shadowTinted);
 }
 
 class _GroundImage {
@@ -510,12 +512,6 @@ void configureBodyShader(
   f(((e >> 16) & 255) / 255); f(((e >> 8) & 255) / 255); f((e & 255) / 255); // edgeColor
   f(lx); f(ly); // lightDirection
   f(halfX / halfLength); f(halfY / halfLength); f(halfZ / halfLength); // halfway
-  final d = shadowVector(s.shadowDegrees);
-  f(d.dx); f(d.dy); // shadowDirection
-  // shadowSpan: the minimum of dot(p / size, d) over the unit box and its
-  // extent. For 180 degrees this is (0, 1), reproducing position.y / height.
-  f(math.min(0.0, d.dx) + math.min(0.0, d.dy));
-  f(d.dx.abs() + d.dy.abs());
 }
 
 final ByteData _bits = ByteData(4);
@@ -562,6 +558,13 @@ void paintGround(Canvas canvas, Path path, Size size, SeaGlassStyle s, SeaGlassP
       size.width + kSeaGlassPadding * 2, size.height + kSeaGlassPadding * 2);
   // Compose converts these float alphas to 8-bit color with rounding.
   Color argb(double alpha, int rgb) => Color(((f32(alpha) * 255).round() << 24) | rgb);
+  final body = palette.body.toARGB32();
+  // Extension: tinted shadows use the pigment at 40% brightness.
+  int shadowRgb(int neutral) {
+    if (!s.shadowTinted) return neutral;
+    int dim(int channel) => (channel * 0.4).round().clamp(0, 255);
+    return (dim((body >> 16) & 255) << 16) | (dim((body >> 8) & 255) << 8) | dim(body & 255);
+  }
 
   final direction = shadowVector(s.shadowDegrees);
 
@@ -578,16 +581,15 @@ void paintGround(Canvas canvas, Path path, Size size, SeaGlassStyle s, SeaGlassP
   layer(
     math.min(16.0, s.thickness * 0.40 + s.elevation * 0.72 + s.bulge * short * 0.03),
     math.min(6.0, 2.5 + s.elevation * 0.18 + s.frost * 0.7 + s.bulge * short * 0.018),
-    Paint()..color = argb((0.18 + s.elevation * 0.001) * (1.0 - t * 0.82), 0x3F4342),
+    Paint()..color = argb((0.18 + s.elevation * 0.001) * (1.0 - t * 0.82), shadowRgb(0x3F4342)),
   );
   layer(
     math.min(8.0, s.thickness * 0.32 + 0.8),
     1.4 + s.elevation * 0.065,
-    Paint()..color = argb(0.10 * (1.0 - t * 0.70), 0x3D413F),
+    Paint()..color = argb(0.10 * (1.0 - t * 0.70), shadowRgb(0x3D413F)),
   );
   if (t > 0.001) {
     final travel = 4.0 + s.elevation * 0.56 + short * 0.055;
-    final body = palette.body.toARGB32();
     int tint(int channel) => (255.0 - (255 - channel) * 1.35).round().clamp(0, 255);
     final tintRgb = (tint((body >> 16) & 255) << 16) | (tint((body >> 8) & 255) << 8) | tint(body & 255);
     layer(

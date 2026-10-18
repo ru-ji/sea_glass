@@ -29,17 +29,25 @@ SeaGlassButton(
 - `SeaGlassTheme` – inheritable defaults (`style`, `palette`, `shape`); nested themes override only what they set.
 - `SeaGlassComponentStyle` – style + palette + shape bundle for design systems.
 
-## Shadow direction
-`shadowDegrees` sets where the ground light falls: 180 is down (the default and the original's
-fixed direction), 90 is right, 0 is up. The cast and contact shadows, the colored transmitted pool
-and the body's luminous exit edge follow it together. It is independent of `lightDegrees`, which
-only moves surface reflections. At 180 the output is bit-identical to the original.
+## Shadow direction and tint
+Two extensions to the original, both applied only to the ground light (the three blurred layers
+of `RealtimeGround`). The glass body is unchanged.
+
+- `shadowDegrees` sets where the cast shadow, contact shadow and transmitted color pool fall:
+  180 is down (the default and the original's fixed direction), 90 is right, 0 is up. It is
+  independent of `lightDegrees`, which only moves surface reflections.
+- `shadowTinted: true` tints the cast and contact shadows with the body pigment at 40% brightness
+  instead of the original's neutral gray.
 
 ```dart
-SeaGlassStyle.reference.copyWith(shadowDegrees: 135) // down-right
+SeaGlassStyle.reference.copyWith(shadowDegrees: 135, shadowTinted: true)
 ```
 
-<p align="center"><img src="doc/screenshots/shadow_directions.png" width="260" alt="The same pill with its shadow falling down, right, down-right, left and up" /></p>
+With the defaults (180, untinted) the output is the original's. Each variant is checked against
+the Kotlin exporter (`renderGroundExtended`), which applies the same extension to the original
+ground code path.
+
+<p align="center"><img src="doc/screenshots/shadow_directions.png" width="260" alt="The same pill with neutral and tinted shadows in several directions" /></p>
 
 ## Recipes and palettes
 `SeaGlassStyle.reference / tumbled / quiet`, or `copyWith(frost, grain, tumble, thickness, bulge, elevation, lightDegrees, transmission, seed)`.

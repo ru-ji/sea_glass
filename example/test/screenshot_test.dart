@@ -71,7 +71,8 @@ class ShadowDirections extends StatelessWidget {
       color: Colors.white,
       child: Center(
         child: Column(mainAxisSize: MainAxisSize.min, children: [
-          for (final (degrees, label) in [(180.0, '180° down'), (90.0, '90° right'), (135.0, '135° down-right'), (270.0, '270° left'), (0.0, '0° up')])
+          for (final (degrees, tinted, label) in [(180.0, false, '180° down'), (180.0, true, '180° tinted'),
+              (135.0, false, '135° down-right'), (90.0, false, '90° right'), (135.0, true, '135° tinted')])
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 34),
               child: SeaGlassSurface(
@@ -79,7 +80,7 @@ class ShadowDirections extends StatelessWidget {
                 height: 64,
                 shape: SeaGlassShape.capsule,
                 palette: lagoonPill,
-                style: pillStyle.copyWith(shadowDegrees: degrees, seed: degrees.toInt()),
+                style: pillStyle.copyWith(shadowDegrees: degrees, shadowTinted: tinted, seed: degrees.toInt()),
                 child: Text(label, style: const TextStyle(fontSize: 20)),
               ),
             ),
