@@ -71,6 +71,19 @@ class SeaGlass extends StatefulWidget {
 
   @override
   State<SeaGlass> createState() => _SeaGlassState();
+
+  /// Prepares the shader and the geometry for a piece of [size] so it draws
+  /// completely on its first frame (for example before showing a screen).
+  /// Geometry depends only on size, shape, tumble and seed.
+  static Future<void> precache(
+    Size size, {
+    SeaGlassStyle style = SeaGlassStyle.reference,
+    SeaGlassShape shape = SeaGlassShape.rounded,
+  }) async {
+    await SeaGlassShaderProgram.load();
+    final key = SeaGlassGeometryController.keyFor(size, shape, style.normalized());
+    (await SeaGlassGeometryCache.obtain(key))?.dispose();
+  }
 }
 
 class _SeaGlassState extends State<SeaGlass> with _GlassState {

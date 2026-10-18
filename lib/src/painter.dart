@@ -25,12 +25,14 @@ class SeaGlassShaderProgram {
   static ui.FragmentProgram? get loaded => _program;
 
   static Future<ui.FragmentProgram?> load() => _loading ??= () async {
-        try {
-          return _program = await ui.FragmentProgram.fromAsset(asset);
-        } catch (e) {
-          debugPrint('sea_glass: shader unavailable ($e)');
-          return null;
+        // The package-relative key applies inside this package's own tests.
+        for (final key in const [asset, 'shaders/sea_glass.frag']) {
+          try {
+            return _program = await ui.FragmentProgram.fromAsset(key);
+          } catch (_) {}
         }
+        debugPrint('sea_glass: shader unavailable');
+        return null;
       }();
 }
 
@@ -60,9 +62,64 @@ class LiveGeometry {
   final int width, height;
   final double gradientScaleA, gradientScaleB;
 
+  /// A handle sharing the same GPU images; dispose each handle independently.
+  LiveGeometry clone() => LiveGeometry(key, path, a.clone(), b.clone(), width, height, gradientScaleA, gradientScaleB);
+
+  int get byteSize => width * height * 16 * 2;
+
   void dispose() {
     a.dispose();
     b.dispose();
+  }
+}
+
+/// Shared LRU of immutable geometry (like the reference's
+/// sharedLiveMaterialGeometryCache): up to 32 entries within a texture budget.
+/// Matching pieces, revisited screens and precached sizes draw on first paint.
+class SeaGlassGeometryCache {
+  SeaGlassGeometryCache._();
+
+  static const int maxEntries = 32;
+  static const int maxBytes = 32 << 20;
+  static final Map<GeometryKey, LiveGeometry> _entries = {};
+  static final Map<GeometryKey, Future<LiveGeometry?>> _building = {};
+  static int _bytes = 0;
+
+  /// A new handle to a cached geometry, or null.
+  static LiveGeometry? lookup(GeometryKey key) {
+    final g = _entries.remove(key);
+    if (g == null) return null;
+    _entries[key] = g; // most recently used
+    return g.clone();
+  }
+
+  /// Builds (once per key) and caches; resolves to a new handle.
+  static Future<LiveGeometry?> obtain(GeometryKey key) async {
+    final hit = lookup(key);
+    if (hit != null) return hit;
+    final g = await (_building[key] ??= SeaGlassGeometryController._build(key)
+      ..whenComplete(() => _building.remove(key)));
+    if (g == null) return null;
+    if (!_entries.containsKey(key)) {
+      _entries[key] = g;
+      _bytes += g.byteSize;
+      while (_entries.length > maxEntries || (_bytes > maxBytes && _entries.length > 1)) {
+        final oldest = _entries.keys.first;
+        final evicted = _entries.remove(oldest)!;
+        _bytes -= evicted.byteSize;
+        evicted.dispose();
+      }
+    }
+    return lookup(key) ?? g.clone();
+  }
+
+  /// Releases every cached geometry. Live pieces keep their own handles.
+  static void clear() {
+    for (final g in _entries.values) {
+      g.dispose();
+    }
+    _entries.clear();
+    _bytes = 0;
   }
 }
 
@@ -105,6 +162,14 @@ class SeaGlassGeometryController extends ChangeNotifier {
       _pending = null;
       return;
     }
+    // Cached geometry applies synchronously, during this paint.
+    final cached = SeaGlassGeometryCache.lookup(key);
+    if (cached != null) {
+      _displayed?.dispose();
+      _displayed = cached;
+      _pending = null;
+      return;
+    }
     if (_active != null) {
       _pending = key;
       return;
@@ -114,7 +179,7 @@ class SeaGlassGeometryController extends ChangeNotifier {
 
   void _start(GeometryKey key) {
     _active = key;
-    _build(key).then((g) {
+    SeaGlassGeometryCache.obtain(key).then((g) {
       if (_disposed) {
         g?.dispose();
         return;
@@ -138,22 +203,7 @@ class SeaGlassGeometryController extends ChangeNotifier {
       final width = math.max(1, (k.widthDp * k.fieldScale).ceil());
       final height = math.max(1, (k.heightDp * k.fieldScale).ceil());
       final columns = width + 2, rows = height + 2;
-      // Mask rasterizer: source-over white, scaled path, offset by one pixel.
-      final recorder = ui.PictureRecorder();
-      Canvas(recorder)
-        ..translate(1, 1)
-        ..drawPath(contourToPath(segments, k.fieldScale), Paint()
-          ..color = const Color(0xFFFFFFFF)
-          ..isAntiAlias = true);
-      final picture = recorder.endRecording();
-      final maskImage = await picture.toImage(columns, rows);
-      picture.dispose();
-      final rgba = (await maskImage.toByteData(format: ui.ImageByteFormat.rawRgba))!;
-      maskImage.dispose();
-      final coverage = Uint8List(columns * rows);
-      for (var i = 0; i < coverage.length; i++) {
-        coverage[i] = rgba.getUint8(i * 4 + 3);
-      }
+      final coverage = await rasterizeMask(segments, columns, rows, k.fieldScale);
       final textures = await compute(
         buildGeometryTextures,
         GeometryRequest(
@@ -161,22 +211,14 @@ class SeaGlassGeometryController extends ChangeNotifier {
           seed: k.seed, width: width, height: height, coverage: coverage,
         ),
       );
-      final a = await _upload(textures.a, width, height);
-      final b = await _upload(textures.b, width, height);
+      final a = await uploadFloatTexture(textures.a, width, height);
+      final b = await uploadFloatTexture(textures.b, width, height);
       return LiveGeometry(k, contourToPath(segments), a, b, width, height,
           textures.gradientScaleA, textures.gradientScaleB);
     } catch (e, s) {
       debugPrint('sea_glass: geometry build failed: $e\n$s');
       return null;
     }
-  }
-
-  /// Opaque float RGBA keeps the encoded fields out of color conversion.
-  static Future<ui.Image> _upload(Float32List data, int width, int height) {
-    final done = Completer<ui.Image>();
-    ui.decodeImageFromPixels(data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes),
-        width, height, ui.PixelFormat.rgbaFloat32, done.complete);
-    return done.future;
   }
 
   @override
@@ -210,93 +252,23 @@ class SeaGlassPainter extends CustomPainter {
     final s = style.normalized();
     controller.request(size, shape, s);
     final geometry = controller.displayedFor(size);
-    // Like the reference, a displayed geometry keeps its own seed and tumble.
-    final path = geometry?.path ?? controller.pathFor(size, shape, s);
-    canvas.save();
-    _paintGround(canvas, path, size, s);
-    if (geometry != null && program != null) _paintBody(canvas, size, s, geometry, program!);
-    canvas.restore();
-  }
-
-  /// Port of RealtimeGround: each layer is drawn, then blurred as a whole.
-  void _paintGround(Canvas canvas, Path path, Size size, SeaGlassStyle s) {
-    final short = math.min(size.width, size.height);
-    final t = s.transmission;
-    final bounds = Rect.fromLTWH(-kSeaGlassPadding, -kSeaGlassPadding,
-        size.width + kSeaGlassPadding * 2, size.height + kSeaGlassPadding * 2);
-
-    void layer(double offset, double sigma, Paint paint) {
-      canvas.saveLayer(
-        bounds,
-        Paint()..imageFilter = sigma > 0
-            ? ui.ImageFilter.blur(sigmaX: sigma, sigmaY: sigma, tileMode: TileMode.decal)
-            : null,
-      );
-      canvas.translate(0, offset);
-      canvas.drawPath(path, paint..isAntiAlias = true);
-      canvas.restore();
-    }
-
-    layer(
-      math.min(16.0, s.thickness * 0.40 + s.elevation * 0.72 + s.bulge * short * 0.03),
-      math.min(6.0, 2.5 + s.elevation * 0.18 + s.frost * 0.7 + s.bulge * short * 0.018),
-      Paint()..color = Color(0xFF3F4342).withValues(alpha: f32((0.18 + s.elevation * 0.001) * (1.0 - t * 0.82))),
-    );
-    layer(
-      math.min(8.0, s.thickness * 0.32 + 0.8),
-      1.4 + s.elevation * 0.065,
-      Paint()..color = Color(0xFF3D413F).withValues(alpha: f32(0.10 * (1.0 - t * 0.70))),
-    );
-    if (t > 0.001) {
-      final travel = 4.0 + s.elevation * 0.56 + short * 0.055;
-      final body = palette.body.toARGB32();
-      int tint(int channel) => (255.0 - (255 - channel) * 1.35).round().clamp(0, 255);
-      final tintColor = Color.fromARGB(
-          255, tint((body >> 16) & 255), tint((body >> 8) & 255), tint(body & 255));
-      layer(
-        math.min(22.0, s.thickness * 0.42 + travel),
-        math.min(8.0, 2.8 + short * 0.033 + s.frost * 1.6),
-        Paint()
-          ..shader = ui.Gradient.linear(
-            Offset.zero,
-            Offset(0, size.height),
-            [
-              tintColor.withValues(alpha: 0),
-              tintColor.withValues(alpha: f32(t * 0.06)),
-              tintColor.withValues(alpha: f32(t * 0.48)),
-              tintColor.withValues(alpha: f32(t * 0.94)),
-            ],
-            const [0.0, 0.45, 0.75, 1.0],
-          ),
-      );
-    }
+    // Like the reference, never show a partial piece: ground and body appear
+    // together once this size's geometry exists. A displayed geometry keeps its
+    // own seed and tumble while a newer one is prepared.
+    if (geometry == null || program == null) return;
+    paintGround(canvas, geometry.path, size, s, palette);
+    _paintBody(canvas, size, s, geometry, program!);
   }
 
   void _paintBody(Canvas canvas, Size size, SeaGlassStyle s, LiveGeometry g, ui.FragmentProgram p) {
-    final theta = s.lightDegrees * math.pi / 180.0;
-    final lx = math.sin(theta);
-    final ly = -math.cos(theta);
-    const lightZ = 0.52;
-    final lightSide = math.sqrt(1.0 - lightZ * lightZ);
-    final halfX = lx * lightSide, halfY = ly * lightSide, halfZ = lightZ + 1.0;
-    final halfLength = math.sqrt(halfX * halfX + halfY * halfY + halfZ * halfZ);
-    final shader = p.fragmentShader()
-      ..setImageSampler(0, g.a, filterQuality: FilterQuality.low)
-      ..setImageSampler(1, g.b, filterQuality: FilterQuality.low);
-    var i = 0;
-    void f(double v) => shader.setFloat(i++, v);
-    f(g.key.widthDp); f(g.key.heightDp); // materialSize
-    f(g.key.fieldScale); // fieldScale
-    f(1.0); // density: Flutter fragment coordinates are already logical pixels
-    f(g.gradientScaleA); f(g.gradientScaleB); // gradientScales
-    f(g.width.toDouble()); f(g.height.toDouble()); // geometrySize
-    f(s.frost); f(s.grain); f(s.thickness); f(s.bulge); // recipeA
-    f(s.lightDegrees); f(s.transmission); f(SeaGlassRandom(g.key.seed).nextDouble()); f(0); // recipeB
-    final body = palette.body.toARGB32(), edge = palette.edge.toARGB32();
-    f(((body >> 16) & 255) / 255); f(((body >> 8) & 255) / 255); f((body & 255) / 255); // bodyColor
-    f(((edge >> 16) & 255) / 255); f(((edge >> 8) & 255) / 255); f((edge & 255) / 255); // edgeColor
-    f(lx); f(ly); // lightDirection
-    f(halfX / halfLength); f(halfY / halfLength); f(halfZ / halfLength); // halfway
+    final shader = p.fragmentShader();
+    configureBodyShader(
+      shader, g.a, g.b,
+      widthDp: g.key.widthDp, heightDp: g.key.heightDp, fieldScale: g.key.fieldScale,
+      gradientScaleA: g.gradientScaleA, gradientScaleB: g.gradientScaleB,
+      textureWidth: g.width, textureHeight: g.height,
+      style: s, seed: g.key.seed, body: palette.body, edge: palette.edge,
+    );
     canvas.drawPath(g.path, Paint()
       ..isAntiAlias = true
       ..shader = shader);
@@ -320,4 +292,168 @@ class SeaGlassClipper extends CustomClipper<Path> {
 
   @override
   bool shouldReclip(SeaGlassClipper old) => style != old.style || shape != old.shape;
+}
+
+/// composeMaskRasterizer: white source-over on transparent, antialiased,
+/// path scaled by [scale] and offset by one pixel. Returns alpha bytes.
+Future<Uint8List> rasterizeMask(List<ContourSegment> segments, int columns, int rows, double scale) async {
+  final recorder = ui.PictureRecorder();
+  Canvas(recorder)
+    ..translate(1, 1)
+    ..drawPath(contourToPath(segments, scale), Paint()
+      ..color = const Color(0xFFFFFFFF)
+      ..isAntiAlias = true);
+  final picture = recorder.endRecording();
+  final image = await picture.toImage(columns, rows);
+  picture.dispose();
+  final rgba = (await image.toByteData(format: ui.ImageByteFormat.rawRgba))!;
+  image.dispose();
+  final coverage = Uint8List(columns * rows);
+  for (var i = 0; i < coverage.length; i++) {
+    coverage[i] = rgba.getUint8(i * 4 + 3);
+  }
+  return coverage;
+}
+
+/// Opaque float RGBA keeps the encoded fields out of color conversion. Values
+/// are first rounded to IEEE binary16, because the reference uploads RGBA_F16
+/// on every platform; the GPU then samples exactly the same texel values.
+Future<ui.Image> uploadFloatTexture(Float32List data, int width, int height) {
+  final rounded = Float32List(data.length);
+  for (var i = 0; i < data.length; i++) {
+    rounded[i] = halfToFloat(float16Bits(data[i]));
+  }
+  final done = Completer<ui.Image>();
+  ui.decodeImageFromPixels(rounded.buffer.asUint8List(),
+      width, height, ui.PixelFormat.rgbaFloat32, done.complete);
+  return done.future;
+}
+
+/// Binds the geometry textures and sets every uniform of sea_glass.frag in
+/// declaration order, with the same values LiveMaterialRenderer uses.
+void configureBodyShader(
+  ui.FragmentShader shader,
+  ui.Image geometryA,
+  ui.Image geometryB, {
+  required double widthDp,
+  required double heightDp,
+  required double fieldScale,
+  required double gradientScaleA,
+  required double gradientScaleB,
+  required int textureWidth,
+  required int textureHeight,
+  required SeaGlassStyle style,
+  required int seed,
+  required Color body,
+  required Color edge,
+}) {
+  final s = style;
+  final theta = s.lightDegrees * math.pi / 180.0;
+  final lx = math.sin(theta);
+  final ly = -math.cos(theta);
+  const lightZ = 0.52;
+  final lightSide = math.sqrt(1.0 - lightZ * lightZ);
+  final halfX = lx * lightSide, halfY = ly * lightSide, halfZ = lightZ + 1.0;
+  final halfLength = math.sqrt(halfX * halfX + halfY * halfY + halfZ * halfZ);
+  shader
+    ..setImageSampler(0, geometryA, filterQuality: FilterQuality.low)
+    ..setImageSampler(1, geometryB, filterQuality: FilterQuality.low);
+  var i = 0;
+  void f(double v) => shader.setFloat(i++, v);
+  f(widthDp); f(heightDp); // materialSize
+  f(fieldScale); // fieldScale
+  f(1.0); // density: Flutter fragment coordinates are already logical pixels
+  f(gradientScaleA); f(gradientScaleB); // gradientScales
+  f(textureWidth.toDouble()); f(textureHeight.toDouble()); // geometrySize
+  f(s.frost); f(s.grain); f(s.thickness); f(s.bulge); // recipeA
+  f(s.lightDegrees); f(s.transmission); f(SeaGlassRandom(seed).nextDouble()); f(0); // recipeB
+  final b = body.toARGB32(), e = edge.toARGB32();
+  f(((b >> 16) & 255) / 255); f(((b >> 8) & 255) / 255); f((b & 255) / 255); // bodyColor
+  f(((e >> 16) & 255) / 255); f(((e >> 8) & 255) / 255); f((e & 255) / 255); // edgeColor
+  f(lx); f(ly); // lightDirection
+  f(halfX / halfLength); f(halfY / halfLength); f(halfZ / halfLength); // halfway
+}
+
+final ByteData _bits = ByteData(4);
+
+/// IEEE binary16, round-to-nearest-even (port of the reference float16Bits).
+int float16Bits(double value) {
+  _bits.setFloat32(0, value);
+  final bits = _bits.getUint32(0);
+  final sign = (bits >>> 16) & 0x8000;
+  final exponent = (bits >>> 23) & 0xFF;
+  final mantissa = bits & 0x7FFFFF;
+  if (exponent == 0xFF) return sign | (mantissa == 0 ? 0x7C00 : 0x7E00);
+  final halfExponent = exponent - 127 + 15;
+  if (halfExponent >= 31) return sign | 0x7C00;
+  if (halfExponent <= 0) {
+    if (halfExponent < -10) return sign;
+    final significant = mantissa | 0x800000;
+    final shift = 14 - halfExponent;
+    var rounded = significant >>> shift;
+    final remainder = significant & ((1 << shift) - 1);
+    final halfway = 1 << (shift - 1);
+    if (remainder > halfway || (remainder == halfway && (rounded & 1) != 0)) rounded++;
+    return sign | rounded;
+  }
+  final rounded = mantissa + 0xFFF + ((mantissa >>> 13) & 1);
+  return sign | ((halfExponent << 10) + (rounded >>> 13));
+}
+
+double halfToFloat(int h) {
+  final sign = (h & 0x8000) != 0 ? -1.0 : 1.0;
+  final exponent = (h >>> 10) & 0x1F;
+  final mantissa = h & 0x3FF;
+  if (exponent == 0) return sign * mantissa * math.pow(2, -24);
+  if (exponent == 31) return mantissa == 0 ? sign * double.infinity : double.nan;
+  return sign * (1 + mantissa / 1024) * math.pow(2, exponent - 15);
+}
+
+/// Port of RealtimeGround: three layers in the original order, each drawn
+/// into its own layer and blurred as a whole (Gaussian sigma, decal tiling).
+void paintGround(Canvas canvas, Path path, Size size, SeaGlassStyle s, SeaGlassPalette palette) {
+  final short = math.min(size.width, size.height);
+  final t = s.transmission;
+  final bounds = Rect.fromLTWH(-kSeaGlassPadding, -kSeaGlassPadding,
+      size.width + kSeaGlassPadding * 2, size.height + kSeaGlassPadding * 2);
+  // Compose converts these float alphas to 8-bit color with rounding.
+  Color argb(double alpha, int rgb) => Color(((f32(alpha) * 255).round() << 24) | rgb);
+
+  void layer(double offset, double sigma, Paint paint) {
+    canvas.saveLayer(
+      bounds,
+      Paint()..imageFilter = ui.ImageFilter.blur(sigmaX: sigma, sigmaY: sigma, tileMode: TileMode.decal),
+    );
+    canvas.translate(0, offset);
+    canvas.drawPath(path, paint..isAntiAlias = true);
+    canvas.restore();
+  }
+
+  layer(
+    math.min(16.0, s.thickness * 0.40 + s.elevation * 0.72 + s.bulge * short * 0.03),
+    math.min(6.0, 2.5 + s.elevation * 0.18 + s.frost * 0.7 + s.bulge * short * 0.018),
+    Paint()..color = argb((0.18 + s.elevation * 0.001) * (1.0 - t * 0.82), 0x3F4342),
+  );
+  layer(
+    math.min(8.0, s.thickness * 0.32 + 0.8),
+    1.4 + s.elevation * 0.065,
+    Paint()..color = argb(0.10 * (1.0 - t * 0.70), 0x3D413F),
+  );
+  if (t > 0.001) {
+    final travel = 4.0 + s.elevation * 0.56 + short * 0.055;
+    final body = palette.body.toARGB32();
+    int tint(int channel) => (255.0 - (255 - channel) * 1.35).round().clamp(0, 255);
+    final tintRgb = (tint((body >> 16) & 255) << 16) | (tint((body >> 8) & 255) << 8) | tint(body & 255);
+    layer(
+      math.min(22.0, s.thickness * 0.42 + travel),
+      math.min(8.0, 2.8 + short * 0.033 + s.frost * 1.6),
+      Paint()
+        ..shader = ui.Gradient.linear(
+          Offset.zero,
+          Offset(0, size.height),
+          [argb(0, tintRgb), argb(t * 0.06, tintRgb), argb(t * 0.48, tintRgb), argb(t * 0.94, tintRgb)],
+          const [0.0, 0.45, 0.75, 1.0],
+        ),
+    );
+  }
 }

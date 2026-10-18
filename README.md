@@ -34,24 +34,45 @@ SeaGlassPalette.fromColorScheme(dynamicScheme)       // e.g. from dynamic_color
 ```
 
 ## Fidelity to the original
-- `shaders/sea_glass.frag` is a mechanical translation of `SeaGlassBodyShader.kt`. Only type names
-  (`float2`→`vec2`, …), the entry point and texture sampling (`eval` → `texture`, plus a
-  `geometrySize` uniform) differ. Every equation and constant is unchanged.
-- The geometry pipeline is ported line by line: the seeded Mulberry32 stream, the tumbled B-spline
-  contour, the Euclidean distance transform, tanh/arch profiles, cloud noise, height smoothing,
-  gradient encoding and the 262,144-sample budget. Textures are uploaded as opaque RGBA float32
-  with bilinear sampling.
-- Ground light ports `RealtimeGround`: the same three layers, offsets, Gaussian sigmas, colors
-  and transmission gradient, each blurred as a whole.
-- Tests check the random stream and contour points against fixtures generated from the original
-  web reference (`test/fixtures/web_reference.json`).
-- Platform rasterization and blur can differ by subpixel amounts, as they already do between the
-  original's Android and Skia targets.
-- Geometry is built asynchronously (mask readback needs a frame), so on first paint only the
-  ground light shows until the body arrives, typically one frame later. Later edits keep the last
-  complete geometry visible, as in the original.
-- If fragment shaders are unavailable, only the ground light is drawn.
+`test/kotlin_parity_test.dart` compares this package with the original implementation.
+`tool/kotlin_reference/export.sh` compiles the original Kotlin geometry sources unchanged, renders
+the original `SeaGlassBodyShader` through Skia (skiko 0.9.37.4, as shipped with Compose 1.10.3)
+and exports reference data. The pinned commit is in `test/fixtures/kotlin/REVISION`. Results
+over five cases (rounded, disc, capsule, portrait, and a large piece above the sample budget):
+
+| Stage | Result |
+| --- | --- |
+| Random stream, contour points | identical (also vs the web reference) |
+| Contour mask rasterization | identical bytes |
+| Geometry textures (profiles, gradients, scales) | bit-identical floats |
+| Body shader, Kotlin textures | pixel-identical RGBA |
+| Body shader, full Dart pipeline | pixel-identical RGBA |
+| Ground light (shadows, transmitted light) | max 3/255 per channel, mean below 1/255 |
+
+The ground difference does not come from the recipe. With blur disabled, alpha is identical and
+premultiplied color still differs by a few levels, because the two Skia builds round translucent
+blending differently. The original also uses each platform's own blur.
+
+`shaders/sea_glass.frag` is a mechanical translation of `SeaGlassBodyShader.kt`. Only type
+names, the entry point and texture sampling (plus a `geometrySize` uniform) differ. Textures are
+rounded to binary16 before upload, as the original uploads RGBA_F16.
+
+### First frame
+Flutter cannot read back a rasterized mask or create an image synchronously, so a piece's first
+geometry is built asynchronously. A piece never shows partially: ground and body appear together.
+To draw on the very first frame, as the original does, precache the size:
+
+```dart
+await SeaGlass.precache(const Size(270, 88), style: SeaGlassStyle.reference.copyWith(seed: 33));
+```
+
+Built geometry is kept in a shared LRU (32 entries, like the original), so revisited screens and
+repeated pieces also draw immediately.
+
+### Not yet verified
+- Rendering on a device or emulator. Impeller (the default on iOS and Android) may round
+  differently from the Skia software renderer used by `flutter test`.
+
 - The material paints up to 48 px outside its layout box; avoid clipping ancestors.
-- Not yet verified on a device or emulator.
 
 Credit: material design and shader math by [mttmcknn/sea-glass](https://github.com/mttmcknn/sea-glass); see its license.
