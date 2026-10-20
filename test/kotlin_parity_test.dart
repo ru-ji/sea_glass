@@ -2,7 +2,7 @@
 // The fixtures in test/fixtures/kotlin (revision in REVISION) come from
 // tool/kotlin_reference, which compiles the original geometry sources
 // unchanged and renders the original SeaGlassBodyShader through Skia.
-// Regenerate them with tool/kotlin_reference/export.sh.
+// Regenerate them by rerunning the harness in tool/kotlin_reference.
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;

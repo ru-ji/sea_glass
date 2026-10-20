@@ -1,5 +1,5 @@
 // Renders the promo loop frame by frame with the real shader. This is opt-in
-// because it writes hundreds of frames. Use tool/render_promo.sh, or:
+// because it writes hundreds of frames. Run:
 //   flutter test test/promo_video_test.dart --dart-define=RENDER_PROMO=true
 import 'dart:io';
 import 'dart:ui' as ui;
