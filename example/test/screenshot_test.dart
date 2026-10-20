@@ -10,8 +10,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sea_glass/sea_glass.dart';
 import 'package:sea_glass_example/main.dart';
 import 'package:sea_glass_example/pages/pill_page.dart';
+import 'package:sea_glass_example/pages/messages_page.dart';
+import 'package:sea_glass_example/pages/showcase_page.dart';
+import 'package:sea_glass_example/pages/toolbars_page.dart';
 
 import 'fonts.dart';
+
+final _theme = ThemeData(fontFamily: 'Google Sans');
 
 void main() {
   setUpAll(loadFonts);
@@ -20,12 +25,16 @@ void main() {
     ('quick_settings', const SeaGlassExampleApp(initialPage: 0)),
     ('pill', const SeaGlassExampleApp(initialPage: 1)),
     ('playground', const SeaGlassExampleApp(initialPage: 2)),
-    ('shadow_directions', const MaterialApp(debugShowCheckedModeBanner: false, home: ShadowDirections())),
+    ('showcase', MaterialApp(debugShowCheckedModeBanner: false, theme: _theme, home: const ShowcasePage())),
+    ('toolbars', MaterialApp(debugShowCheckedModeBanner: false, theme: _theme, home: const ToolbarsPage())),
+    ('messages', MaterialApp(debugShowCheckedModeBanner: false, theme: _theme, home: const MessagesPage())),
+    ('shadow_directions', MaterialApp(debugShowCheckedModeBanner: false, theme: _theme, home: const ShadowDirections())),
   ];
   for (final (name, app) in pages) {
     testWidgets('screenshot $name', (tester) async {
-      tester.view.physicalSize = const Size(1080, 2340);
-      tester.view.devicePixelRatio = 2.625;
+      final wide = name == 'showcase' || name == 'toolbars' || name == 'messages';
+      tester.view.physicalSize = name == 'messages' ? const Size(2000, 1400) : wide ? const Size(2000, 1125) : const Size(1080, 2340);
+      tester.view.devicePixelRatio = wide ? 2 : 2.625;
       addTearDown(tester.view.reset);
       final boundary = GlobalKey();
       await tester.pumpWidget(RepaintBoundary(key: boundary, child: app));
@@ -36,7 +45,7 @@ void main() {
       }
       final bytes = await tester.runAsync(() async {
         final render = boundary.currentContext!.findRenderObject()! as RenderRepaintBoundary;
-        final image = await render.toImage(pixelRatio: 2.625);
+        final image = await render.toImage(pixelRatio: wide ? 2 : 2.625);
         return (await image.toByteData(format: ui.ImageByteFormat.png))!.buffer.asUint8List();
       });
       Directory('../doc/screenshots').createSync(recursive: true);
@@ -46,29 +55,48 @@ void main() {
   }
 }
 
-/// The same pill with the ground light in a few directions and tints.
+/// New pieces with the ground light in a few directions, tints and alphas.
 class ShadowDirections extends StatelessWidget {
   const ShadowDirections({super.key});
 
+  static const blue = SeaGlassPalette(body: Color(0xFF63B4F2), edge: Color(0xFFC4E8FF), ink: Color(0xFF0B3A6B));
+  static const lemon = SeaGlassPalette(body: Color(0xFFE6E58A), edge: Color(0xFFFFFBC0), ink: Color(0xFF5C5200));
+  static const peach = SeaGlassPalette(body: Color(0xFFF5B27A), edge: Color(0xFFFFD9B0), ink: Color(0xFF7A3A10));
+  static const berry = SeaGlassPalette(body: Color(0xFFD81B7A), edge: Color(0xFFFF9FD0), ink: Colors.white);
+  static const lilac = SeaGlassPalette(body: Color(0xFFE3A8F5), edge: Color(0xFFF8DBFF), ink: Color(0xFF5E1F80));
+
   @override
   Widget build(BuildContext context) {
+    Widget piece(SeaGlassPalette p, double w, double h, SeaGlassShape shape, SeaGlassStyle style, IconData icon,
+            String label) =>
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 26),
+          child: SeaGlassSurface(
+            width: w,
+            height: h,
+            shape: shape,
+            palette: p,
+            style: style,
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              Icon(icon, size: 24), const SizedBox(width: 10), Text(label, style: const TextStyle(fontSize: 19)),
+            ]),
+          ),
+        );
     return Material(
       color: Colors.white,
       child: Center(
         child: Column(mainAxisSize: MainAxisSize.min, children: [
-          for (final (degrees, tinted, label) in [(180.0, false, '180° down'), (180.0, true, '180° tinted'),
-              (135.0, false, '135° down-right'), (90.0, false, '90° right'), (135.0, true, '135° tinted')])
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 34),
-              child: SeaGlassSurface(
-                width: 280,
-                height: 64,
-                shape: SeaGlassShape.capsule,
-                palette: lagoonPill,
-                style: pillStyle.copyWith(shadowDegrees: degrees, shadowTinted: tinted, seed: degrees.toInt()),
-                child: Text(label, style: const TextStyle(fontSize: 20)),
-              ),
-            ),
+          piece(blue, 260, 64, SeaGlassShape.capsule, pillStyle.copyWith(seed: 1), Icons.south, '180° down'),
+          piece(lemon, 260, 64, SeaGlassShape.capsule, pillStyle.copyWith(shadowDegrees: 135, shadowTinted: true, seed: 2),
+              Icons.south_east, '135° tinted'),
+          piece(peach, 200, 96, SeaGlassShape.squircle, pillStyle.copyWith(shadowDegrees: 90, seed: 3), Icons.east,
+              '90° right'),
+          piece(berry, 260, 64, SeaGlassShape.capsule, pillStyle.copyWith(shadowDegrees: 225, shadowTinted: true, seed: 4),
+              Icons.south_west, '225° tinted'),
+          piece(lilac, 260, 64, SeaGlassShape.capsule,
+              pillStyle.copyWith(shadowColor: Colors.black.withValues(alpha: .4), seed: 5), Icons.opacity, 'alpha 0.4'),
+          piece(lilac, 260, 64, SeaGlassShape.capsule,
+              pillStyle.copyWith(shadowColor: Colors.transparent, transmission: 0, seed: 6), Icons.block, 'No shadow'),
         ]),
       ),
     );

@@ -9,11 +9,11 @@ topics:
   - glass
   - shader
   - material-design
-  - ui
+  - uimain
   - widget
 
 screenshots:
-  - description: Sea glass promo, Quick Settings, shadow direction, palettes and the API
+  - description: Sea glass promo, action pills, toolbars, a composer on a photo, shadow direction and the API
     path: doc/screenshots/promo.gif
   - description: The tumble slider reshaping glass buttons live
     path: doc/screenshots/tumble.gif
@@ -21,7 +21,7 @@ screenshots:
     path: doc/screenshots/quick_settings.png
   - description: A teal glass pill with a glowing lower edge
     path: doc/screenshots/pill.png
-  - description: The same pill with neutral and tinted shadows in several directions
+  - description: Glass pieces with shadows in several directions, tinted, faded and turned off
     path: doc/screenshots/shadow_directions.png
 
 environment:

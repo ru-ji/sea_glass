@@ -1,12 +1,14 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sea_glass/sea_glass.dart';
 import 'package:sea_glass/src/contour.dart';
 import 'package:sea_glass/src/material_field.dart';
+import 'package:sea_glass/src/painter.dart';
 import 'package:sea_glass/src/random.dart';
 
 void main() {
@@ -82,6 +84,30 @@ void main() {
     expect(const SeaGlassStyle().shadowTinted, isFalse);
     expect(SeaGlassStyle.reference.copyWith(shadowTinted: true), isNot(SeaGlassStyle.reference));
     expect(SeaGlassStyle.reference.copyWith(shadowTinted: true).normalized().shadowTinted, isTrue);
+  });
+
+  test('shadowColor alpha scales the shadows, transparent removes them', () async {
+    Future<int> maxAlpha(Color? shadow) async {
+      final recorder = ui.PictureRecorder();
+      final canvas = Canvas(recorder)..translate(40, 40);
+      final path = Path()..addRRect(RRect.fromLTRBR(0, 0, 80, 40, const Radius.circular(20)));
+      paintGround(canvas, path, const Size(80, 40),
+          SeaGlassStyle(transmission: 0, shadowColor: shadow), SeaGlassPalette.lagoon);
+      final image = await recorder.endRecording().toImage(160, 120);
+      final bytes = (await image.toByteData())!.buffer.asUint8List();
+      var most = 0;
+      for (var i = 3; i < bytes.length; i += 4) {
+        if (bytes[i] > most) most = bytes[i];
+      }
+      return most;
+    }
+
+    final normal = await maxAlpha(null);
+    final half = await maxAlpha(Colors.black.withValues(alpha: .5));
+    expect(normal, greaterThan(0));
+    expect(half, inExclusiveRange(0, normal));
+    expect(await maxAlpha(Colors.transparent), 0);
+    expect(SeaGlassStyle.reference.copyWith(shadowColor: Colors.red), isNot(SeaGlassStyle.reference));
   });
 
   test('style clamps out-of-range values', () {

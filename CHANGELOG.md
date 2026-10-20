@@ -1,3 +1,11 @@
+## Unreleased
+
+- Added `SeaGlassStyle.shadowColor`. It sets the cast and contact shadow colour, and its alpha
+  scales their opacity, so `Colors.transparent` turns them off. Null keeps the default.
+- Added `SeaGlassShape.squircle`, a squarer rounded rectangle (corner radius 28% of the short side).
+- Example: showcase, toolbar and message boards rendered with the real shader, replacing the old
+  README screenshots, and a new promo loop and shadow screenshot built from them.
+
 ## 0.2.0
 
 - Added `SeaGlassStyle.shadowDegrees` (default 180, straight down). It sets the direction of the

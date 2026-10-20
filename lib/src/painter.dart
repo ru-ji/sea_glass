@@ -247,7 +247,7 @@ class SeaGlassGeometryController extends ChangeNotifier {
   /// RealtimeGround's recorded layers, instead of being blurred on every frame.
   ui.Image groundFor(Path path, Size size, SeaGlassStyle s, SeaGlassPalette palette, double pixelRatio) {
     final key = _GroundKey(path, size, s.thickness, s.bulge, s.frost, s.elevation, s.transmission,
-        palette.body.toARGB32() & 0xFFFFFF, pixelRatio, s.shadowDegrees, s.shadowTinted);
+        palette.body.toARGB32() & 0xFFFFFF, pixelRatio, s.shadowDegrees, s.shadowTinted, s.shadowColor);
     final cached = _ground;
     if (cached != null && cached.key == key) return cached.image;
     final recorder = ui.PictureRecorder();
@@ -305,12 +305,13 @@ class SeaGlassGeometryController extends ChangeNotifier {
 @immutable
 class _GroundKey {
   const _GroundKey(this.path, this.size, this.thickness, this.bulge, this.frost, this.elevation,
-      this.transmission, this.body, this.pixelRatio, this.shadowDegrees, this.shadowTinted);
+      this.transmission, this.body, this.pixelRatio, this.shadowDegrees, this.shadowTinted, this.shadowColor);
   final Path path;
   final Size size;
   final double thickness, bulge, frost, elevation, transmission, pixelRatio, shadowDegrees;
   final int body;
   final bool shadowTinted;
+  final Color? shadowColor;
 
   @override
   bool operator ==(Object other) =>
@@ -318,11 +319,11 @@ class _GroundKey {
       other.thickness == thickness && other.bulge == bulge && other.frost == frost &&
       other.elevation == elevation && other.transmission == transmission &&
       other.body == body && other.pixelRatio == pixelRatio && other.shadowDegrees == shadowDegrees &&
-      other.shadowTinted == shadowTinted;
+      other.shadowTinted == shadowTinted && other.shadowColor == shadowColor;
 
   @override
   int get hashCode => Object.hash(identityHashCode(path), size, thickness, bulge, frost, elevation,
-      transmission, body, pixelRatio, shadowDegrees, shadowTinted);
+      transmission, body, pixelRatio, shadowDegrees, shadowTinted, shadowColor);
 }
 
 class _GroundImage {
@@ -561,7 +562,11 @@ void paintGround(Canvas canvas, Path path, Size size, SeaGlassStyle s, SeaGlassP
   Color argb(double alpha, int rgb) => Color(((f32(alpha) * 255).round() << 24) | rgb);
   final body = palette.body.toARGB32();
   // Extension: tinted shadows use the pigment at 40% brightness.
+  // Extension: an explicit shadow colour replaces both, and its alpha scales the opacity.
+  final custom = s.shadowColor;
+  final shadowAlpha = custom == null ? 1.0 : custom.a;
   int shadowRgb(int neutral) {
+    if (custom != null) return custom.toARGB32() & 0xFFFFFF;
     if (!s.shadowTinted) return neutral;
     int dim(int channel) => (channel * 0.4).round().clamp(0, 255);
     return (dim((body >> 16) & 255) << 16) | (dim((body >> 8) & 255) << 8) | dim(body & 255);
@@ -582,12 +587,12 @@ void paintGround(Canvas canvas, Path path, Size size, SeaGlassStyle s, SeaGlassP
   layer(
     math.min(16.0, s.thickness * 0.40 + s.elevation * 0.72 + s.bulge * short * 0.03),
     math.min(6.0, 2.5 + s.elevation * 0.18 + s.frost * 0.7 + s.bulge * short * 0.018),
-    Paint()..color = argb((0.18 + s.elevation * 0.001) * (1.0 - t * 0.82), shadowRgb(0x3F4342)),
+    Paint()..color = argb((0.18 + s.elevation * 0.001) * (1.0 - t * 0.82) * shadowAlpha, shadowRgb(0x3F4342)),
   );
   layer(
     math.min(8.0, s.thickness * 0.32 + 0.8),
     1.4 + s.elevation * 0.065,
-    Paint()..color = argb(0.10 * (1.0 - t * 0.70), shadowRgb(0x3D413F)),
+    Paint()..color = argb(0.10 * (1.0 - t * 0.70) * shadowAlpha, shadowRgb(0x3D413F)),
   );
   if (t > 0.001) {
     final travel = 4.0 + s.elevation * 0.56 + short * 0.055;

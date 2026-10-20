@@ -30,6 +30,7 @@ void main() {
     final boundary = GlobalKey();
     Future<void> show(double t) => tester.pumpWidget(MaterialApp(
           debugShowCheckedModeBanner: false,
+          theme: ThemeData(fontFamily: 'Google Sans'),
           home: RepaintBoundary(key: boundary, child: PromoScene(t: t, clip: clip)),
         ));
     // Let the geometry builds finish in the real zone, so each frame is complete.

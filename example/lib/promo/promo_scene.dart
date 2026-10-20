@@ -3,11 +3,14 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:sea_glass/sea_glass.dart';
 
+import '../pages/messages_page.dart';
 import '../pages/pill_page.dart';
 import '../pages/quick_settings_page.dart';
+import '../pages/showcase_page.dart';
+import '../pages/toolbars_page.dart';
 
 /// Total length of the promo loop.
-const promoDuration = Duration(seconds: 8);
+const promoDuration = Duration(seconds: 10);
 
 /// The full release loop, plus three shorter teaser clips.
 enum PromoClip {
@@ -27,11 +30,12 @@ enum PromoClip {
 /// the start), so every frame is deterministic. The last frame fades back to
 /// the empty background of the first, so the loop joins cleanly.
 ///
-/// 0.0-1.7  title, and a pill dropping into place
-/// 1.5-3.6  Quick Settings tiles light up, the brightness slider moves
-/// 3.5-5.6  the shadow turns (shadowDegrees) and takes the tint (shadowTinted)
-/// 5.5-7.1  palettes, then a Material 3 theme
-/// 7.0-8.0  the one-line API, then fade out
+/// 0.0-1.7   title, and a pill dropping into place
+/// 1.5-3.4   album action pills and a close button
+/// 3.3-5.2   a toolbar with a split button, an icon bar and a squircle
+/// 5.1-6.9   a message composer on a photo, with no shadow
+/// 6.8-8.7   the shadow turns (shadowDegrees), then fades out (shadowColor)
+/// 8.6-10.0  the one-line API, then fade out
 class PromoScene extends StatelessWidget {
   const PromoScene({super.key, required this.t, this.clip = PromoClip.release});
 
@@ -74,16 +78,19 @@ class PromoScene extends StatelessWidget {
               ],
             _ => [ // full release
                 _scene(0.0, 1.7, (p) => _Title(t: t)),
-                _scene(1.5, 3.6, (p) => _QuickSettings(t: t)),
-                _scene(3.5, 5.6, (p) => _Shadow(t: t, size: size)),
-                _scene(5.5, 7.1, (p) => _Palettes(t: t, size: size)),
-                _scene(7.0, 8.0, (p) => _Code(t: t)),
+                _scene(1.5, 3.4, (p) => _Drop(t: t - 1.5, child: ShowcasePage.actions())),
+                _scene(3.3, 5.2, (p) => _Toolbars(t: t - 3.3)),
+                _scene(5.1, 6.9, (p) => _Drop(
+                    t: t - 5.1, child: SizedBox(width: 480, height: 320, child: MessagesPage.meadow()))),
+                _scene(6.8, 8.7, (p) => _ShadowFade(t: t - 6.8)),
+                _scene(8.6, 10.0, (p) => _Code(t: t)),
                 _caption(const [
                   (0.3, 1.6, 'Frosted, softly tumbled glass'),
-                  (1.7, 3.5, 'Quick Settings, made of glass'),
-                  (3.7, 5.5, 'Choose where the shadow falls'),
-                  (5.7, 7.0, 'Any palette, or your Material 3 theme'),
-                  (7.1, 7.8, 'One widget.'),
+                  (1.7, 3.3, 'Buttons, pills and actions'),
+                  (3.5, 5.1, 'Toolbars and split buttons'),
+                  (5.3, 6.8, 'On photos, with the shadow off'),
+                  (7.0, 8.5, 'Choose where the shadow falls'),
+                  (8.8, 9.8, 'One widget.'),
                 ]),
               ],
           });
@@ -213,7 +220,7 @@ class _TumbleCapture extends StatelessWidget {
           SizedBox(width: 44, child: Text(value.toStringAsFixed(3), style: const TextStyle(fontSize: 11))),
         ]);
     return Theme(
-      data: ThemeData(colorSchemeSeed: const Color(0xFF1E6F7C), useMaterial3: true),
+      data: ThemeData(colorSchemeSeed: const Color(0xFF1E6F7C), useMaterial3: true, fontFamily: 'Google Sans'),
       child: Scaffold(
         backgroundColor: const Color(0xFFF7F4EF),
         body: SafeArea(
@@ -374,6 +381,93 @@ class _Shadow extends StatelessWidget {
       _CodeChip(lines: [
         'shadowDegrees: ${degrees.toInt()}',
         'shadowTinted: $tinted',
+      ]),
+      const Spacer(flex: 4),
+    ]);
+  }
+}
+
+/// [child] drops in from above with a small overshoot. [t] starts at 0.
+class _Drop extends StatelessWidget {
+  const _Drop({required this.t, required this.child});
+  final double t;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final drop = Curves.easeOutBack.transform(_progress(t, 0.05, 0.8));
+    return Center(
+      child: Transform.translate(
+        offset: Offset(0, (1 - drop) * -60 - 30),
+        child: FittedBox(child: Padding(padding: const EdgeInsets.all(24), child: child)),
+      ),
+    );
+  }
+}
+
+/// The Reply-all toolbar, then the icon bar and squircle a beat later.
+class _Toolbars extends StatelessWidget {
+  const _Toolbars({required this.t});
+  final double t;
+
+  @override
+  Widget build(BuildContext context) {
+    Widget fit(Widget child, double start) {
+      final x = Curves.easeOutBack.transform(_progress(t, start, start + .7));
+      return Opacity(
+        opacity: _ease(_progress(t, start, start + .3)),
+        child: Transform.translate(
+          offset: Offset((1 - x) * 80, 0),
+          child: SizedBox(width: 352, child: FittedBox(child: Padding(padding: const EdgeInsets.all(12), child: child))),
+        ),
+      );
+    }
+
+    return Column(children: [
+      const Spacer(flex: 3),
+      fit(ToolbarsPage.replyBar(), 0.05),
+      const SizedBox(height: 28),
+      fit(ToolbarsPage.emojiBar(), 0.45),
+      const Spacer(flex: 4),
+    ]);
+  }
+}
+
+/// The shadow swings from 180 to 90 to 135 degrees, then its alpha fades to 0.
+class _ShadowFade extends StatelessWidget {
+  const _ShadowFade({required this.t});
+  final double t;
+
+  static const _going = SeaGlassPalette(body: Color(0xFF63B4F2), edge: Color(0xFFC4E8FF), ink: Color(0xFF0B3A6B));
+
+  @override
+  Widget build(BuildContext context) {
+    final turn = Curves.easeInOut.transform(_progress(t, 0.3, 0.9));
+    final settle = Curves.easeInOut.transform(_progress(t, 0.9, 1.25));
+    final degrees = (180 - 90 * turn + 45 * settle).roundToDouble();
+    // Steps of .1, so each alpha's ground light is rasterized only once.
+    final alpha = ((1 - _progress(t, 1.3, 1.7)) * 10).round() / 10;
+    return Column(children: [
+      const Spacer(flex: 3),
+      SeaGlassSurface(
+        width: 220,
+        height: 80,
+        shape: SeaGlassShape.capsule,
+        palette: _going,
+        style: pillStyle.copyWith(
+          shadowDegrees: degrees,
+          elevation: 18,
+          transmission: alpha * .55,
+          shadowColor: const Color(0xFF3F4342).withValues(alpha: alpha),
+        ),
+        child: const Row(mainAxisSize: MainAxisSize.min, children: [
+          Icon(Icons.check_circle, size: 28), SizedBox(width: 10), Text('Going', style: TextStyle(fontSize: 26)),
+        ]),
+      ),
+      const SizedBox(height: 70),
+      _CodeChip(lines: [
+        'shadowDegrees: ${degrees.toInt()}',
+        'shadowColor alpha: ${alpha.toStringAsFixed(1)}',
       ]),
       const Spacer(flex: 4),
     ]);

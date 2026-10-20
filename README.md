@@ -1,20 +1,20 @@
 # sea_glass
 
-Sea Glass gives Flutter widgets the look of frosted, sea-tumbled glass. It is a port of the
-**Sea Glass** material concept ([mttmcknn/sea-glass](https://github.com/mttmcknn/sea-glass),
-written in Compose) for Material 3 apps.
+Sea Glass gives Flutter widgets the look of frosted, sea-tumbled glass. It brings the
+**Material 4 Sea Glass** concept to Flutter: a fan-made idea of sea glass as the next Material
+Design material, first proposed by [@SLKVinyl](https://x.com/SLKVinyl). It is not an official
+Google design. The rendering is a port of [mttmcknn/sea-glass](https://github.com/mttmcknn/sea-glass)
+(Compose), and it works with today's Material 3 themes.
 
 Each piece gets a seeded outline, a fine frost, a soft curve through the body, a bright lower edge
 and coloured light spilling onto the surface below. Text and icons are ordinary widgets; the glass
 is painted behind them.
 
-<p align="center"><img src="doc/screenshots/promo.gif" width="300" alt="Sea glass promo: Quick Settings tiles, shadow direction, palettes and the API" /></p>
+<p align="center"><img src="doc/screenshots/showcase.png" width="720" alt="Buttons, floating action buttons, an icon bar and labelled pills in several palettes, all drawn with sea glass" /></p>
 
-<p align="center">
-  <img src="doc/screenshots/quick_settings.png" width="260" alt="Quick Settings panel made of frosted and teal sea glass tiles" />
-  <img src="doc/screenshots/pill.png" width="260" alt="A large teal glass pill with a glowing lower edge" />
-  <img src="doc/screenshots/playground.png" width="260" alt="Playground with recipes, palettes and sliders" />
-</p>
+<p align="center"><img src="doc/screenshots/toolbars.png" width="720" alt="A tab bar, an input bar, a toolbar with a nested split button, and an icon bar with a rounded action button, all sea glass" /></p>
+
+<p align="center"><img src="doc/screenshots/messages.png" width="720" alt="Message composers with a glass text field and a coloured mic button, on plain and photo backgrounds" /></p>
 
 You need Flutter 3.41 or newer. That is the first release where Impeller accepts float32 textures.
 
@@ -48,16 +48,20 @@ blurred layers in `RealtimeGround`. The glass body itself is unchanged.
   up. It works separately from `lightDegrees`, which moves the surface reflections.
 - `shadowTinted: true` uses the body pigment at 40% brightness for the cast and contact shadows,
   instead of the original's neutral gray.
+- `shadowColor` sets the shadow colour, and its alpha scales the opacity. Use
+  `Colors.black.withValues(alpha: .5)` for lighter shadows, or `Colors.transparent` for none (useful
+  on photos). The transmitted colour pool is set separately by `transmission`.
 
 ```dart
 SeaGlassStyle.reference.copyWith(shadowDegrees: 135, shadowTinted: true)
+SeaGlassStyle.reference.copyWith(shadowColor: Colors.transparent, transmission: 0) // no ground light
 ```
 
 With the defaults (180 and untinted) the output matches the original. Every variant is checked
 against the Kotlin exporter (`renderGroundExtended`), which applies the same change to the
 original ground code path.
 
-<p align="center"><img src="doc/screenshots/shadow_directions.png" width="260" alt="The same pill with neutral and tinted shadows in several directions" /></p>
+<p align="center"><img src="doc/screenshots/shadow_directions.png" width="260" alt="Glass pieces with shadows in several directions, tinted, at 40% alpha and turned off" /></p>
 
 ## Recipes and palettes
 
@@ -117,11 +121,6 @@ await SeaGlass.precache(const Size(270, 88), style: SeaGlassStyle.reference.copy
 Geometry lives in a shared LRU (32 entries, same as the original), so screens you revisit and
 pieces that repeat also draw straight away.
 
-### Not verified yet
-
-- Rendering on a device or emulator. Impeller is the default on iOS and Android and may round
-  differently from the Skia software renderer that `flutter test` uses.
-
 ### One layout caveat
 
 The material paints up to 48 px outside its layout box, so keep clipping ancestors out of the way.
@@ -133,7 +132,7 @@ The material paints up to 48 px outside its layout box, so keep clipping ancesto
 - **Quick settings**: an Android-style panel with toggle tiles and a glass brightness slider.
 - **Pill**: one large glass pill.
 - **Playground**: recipes, palettes, Material 3 colours and live sliders.
-- **Promo**: an 8 second vertical loop.
+- **Promo**: a 10 second vertical loop.
 
 `example/test/promo_video_test.dart` renders the promo frame by frame with the real shader. Use
 ffmpeg on the frames to build `doc/promo/sea_glass_promo.mp4` (720 x 1280, 30 fps); set
@@ -144,6 +143,4 @@ ffmpeg on the frames to build `doc/promo/sea_glass_promo.mp4` (720 x 1280, 30 fp
 
 ## License
 
-Apache 2.0. See [LICENSE](LICENSE) and [NOTICE](NOTICE). The material design and shader math come
-from [mttmcknn/sea-glass](https://github.com/mttmcknn/sea-glass), also Apache 2.0. This package is
-a port with the changes listed in NOTICE.
+Apache 2.0. See [LICENSE](LICENSE).

@@ -31,7 +31,11 @@ List<Offset> buildContour(
   final s1 = 0.18 + random.nextDouble() * 0.04;
   final strength = [s0, s1];
   final samples = math.max(64, count);
-  final radius = shape == SeaGlassShape.capsule ? short / 2.0 : short * 0.46;
+  final radius = switch (shape) {
+    SeaGlassShape.capsule => short / 2.0,
+    SeaGlassShape.squircle => short * 0.28,
+    _ => short * 0.46,
+  };
   final arc = math.pi * radius / 2.0;
   final horizontal = math.max(0.0, w - radius * 2.0);
   final vertical = math.max(0.0, h - radius * 2.0);

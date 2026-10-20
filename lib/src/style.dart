@@ -16,6 +16,7 @@ class SeaGlassStyle {
     this.seed = 42,
     this.shadowDegrees = 180,
     this.shadowTinted = false,
+    this.shadowColor,
   });
 
   /// How cloudy the glass is, 0..1.
@@ -56,6 +57,13 @@ class SeaGlassStyle {
   /// instead of the original's neutral gray. Off by default.
   final bool shadowTinted;
 
+  /// Colour of the cast and contact shadows. Its alpha scales their opacity,
+  /// so `Colors.black.withValues(alpha: .5)` gives half-strength shadows and
+  /// [Colors.transparent] removes them. Null keeps the default (neutral gray,
+  /// or the pigment when [shadowTinted]). The transmitted colour pool is set
+  /// by [transmission] instead.
+  final Color? shadowColor;
+
   static const SeaGlassStyle reference = SeaGlassStyle();
   static const SeaGlassStyle tumbled = SeaGlassStyle(
     frost: .72, grain: .68, tumble: .055, thickness: 9,
@@ -70,6 +78,7 @@ class SeaGlassStyle {
     double? frost, double? grain, double? tumble, double? thickness,
     double? bulge, double? elevation, double? lightDegrees,
     double? transmission, int? seed, double? shadowDegrees, bool? shadowTinted,
+    Color? shadowColor,
   }) =>
       SeaGlassStyle(
         frost: frost ?? this.frost,
@@ -83,6 +92,7 @@ class SeaGlassStyle {
         seed: seed ?? this.seed,
         shadowDegrees: shadowDegrees ?? this.shadowDegrees,
         shadowTinted: shadowTinted ?? this.shadowTinted,
+        shadowColor: shadowColor ?? this.shadowColor,
       );
 
   /// This recipe with every field clamped to its documented range.
@@ -98,6 +108,7 @@ class SeaGlassStyle {
         seed: seed,
         shadowDegrees: _finite(shadowDegrees, 180),
         shadowTinted: shadowTinted,
+        shadowColor: shadowColor,
       );
 
   static double _finite(double v, double fallback) => v.isFinite ? v : fallback;
@@ -109,14 +120,22 @@ class SeaGlassStyle {
       thickness == other.thickness && bulge == other.bulge &&
       elevation == other.elevation && lightDegrees == other.lightDegrees &&
       transmission == other.transmission && seed == other.seed &&
-      shadowDegrees == other.shadowDegrees && shadowTinted == other.shadowTinted;
+      shadowDegrees == other.shadowDegrees && shadowTinted == other.shadowTinted &&
+      shadowColor == other.shadowColor;
 
   @override
   int get hashCode => Object.hash(frost, grain, tumble, thickness, bulge,
-      elevation, lightDegrees, transmission, seed, shadowDegrees, shadowTinted);
+      elevation, lightDegrees, transmission, seed, shadowDegrees, shadowTinted, shadowColor);
 }
 
-enum SeaGlassShape { rounded, capsule, disc }
+enum SeaGlassShape {
+  rounded,
+  capsule,
+  disc,
+
+  /// A squarer rounded rectangle (corner radius 28% of the short side), like an app icon.
+  squircle,
+}
 
 /// Material 3 colour roles you can use as glass pigment.
 enum SeaGlassColorRole {

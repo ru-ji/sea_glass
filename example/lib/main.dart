@@ -17,7 +17,7 @@ class SeaGlassExampleApp extends StatelessWidget {
     return MaterialApp(
       title: 'Sea Glass',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(colorSchemeSeed: const Color(0xFF1E6F7C), useMaterial3: true),
+      theme: ThemeData(colorSchemeSeed: const Color(0xFF1E6F7C), useMaterial3: true, fontFamily: 'Google Sans'),
       home: ExampleHome(initialPage: initialPage),
     );
   }
