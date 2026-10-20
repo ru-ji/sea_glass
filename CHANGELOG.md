@@ -1,4 +1,4 @@
-## Unreleased
+## 0.2.1
 
 - Added `SeaGlassStyle.shadowColor`. It sets the cast and contact shadow colour, and its alpha
   scales their opacity, so `Colors.transparent` turns them off. Null keeps the default.

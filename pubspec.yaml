@@ -1,6 +1,6 @@
 name: sea_glass
 description: Sea glass for Flutter, frosted and softly tumbled, drawn with a real shader. Seeded outlines, frost, a glowing edge and transmitted light for Material 3 apps.
-version: 0.2.0
+version: 0.2.1
 homepage: https://github.com/ru-ji/sea_glass
 repository: https://github.com/ru-ji/sea_glass
 issue_tracker: https://github.com/ru-ji/sea_glass/issues
@@ -9,7 +9,7 @@ topics:
   - glass
   - shader
   - material-design
-  - uimain
+  - ui
   - widget
 
 screenshots:
