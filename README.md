@@ -67,8 +67,17 @@ original ground code path.
 
 Use `SeaGlassStyle.reference`, `tumbled` or `quiet`, or build your own with
 `copyWith(frost, grain, tumble, thickness, bulge, elevation, lightDegrees, transmission, seed)`.
-The palettes are `lagoon`, `lilac`, `rose`, `amber` and `mint`. Shapes are `rounded`, `capsule`
-and `disc`.
+The palettes are `lagoon`, `lilac`, `rose`, `amber` and `mint`. Shapes are `rounded`, `capsule`,
+`disc` and `squircle`.
+
+`tumble` sets how far the outline wanders from a clean shape, like glass worn by the sea: 0 is a
+perfect shape and 0.065 is the most worn. `seed` picks which outline you get, so keep it fixed for a
+piece that should not change between rebuilds.
+
+<p align="center">
+  <img src="doc/screenshots/tumble_levels.png" width="260" alt="The same teal pill at tumble 0, 0.02, 0.04 and 0.065, from a clean capsule to a worn outline" />
+  <img src="doc/screenshots/tumble.gif" width="260" alt="Dragging the Tumble and Frost sliders reshapes glass buttons live" />
+</p>
 
 Keep a piece's `seed` stable. Give neighbours different seeds so their outlines do not repeat.
 

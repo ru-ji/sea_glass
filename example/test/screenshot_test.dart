@@ -28,6 +28,7 @@ void main() {
     ('showcase', MaterialApp(debugShowCheckedModeBanner: false, theme: _theme, home: const ShowcasePage())),
     ('toolbars', MaterialApp(debugShowCheckedModeBanner: false, theme: _theme, home: const ToolbarsPage())),
     ('messages', MaterialApp(debugShowCheckedModeBanner: false, theme: _theme, home: const MessagesPage())),
+    ('tumble_levels', MaterialApp(debugShowCheckedModeBanner: false, theme: _theme, home: const TumbleLevels())),
     ('shadow_directions', MaterialApp(debugShowCheckedModeBanner: false, theme: _theme, home: const ShadowDirections())),
   ];
   for (final (name, app) in pages) {
@@ -97,6 +98,34 @@ class ShadowDirections extends StatelessWidget {
               pillStyle.copyWith(shadowColor: Colors.black.withValues(alpha: .4), seed: 5), Icons.opacity, 'alpha 0.4'),
           piece(lilac, 260, 64, SeaGlassShape.capsule,
               pillStyle.copyWith(shadowColor: Colors.transparent, transmission: 0, seed: 6), Icons.block, 'No shadow'),
+        ]),
+      ),
+    );
+  }
+}
+
+/// The same piece from a clean outline (tumble 0) to the most worn (0.065).
+class TumbleLevels extends StatelessWidget {
+  const TumbleLevels({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white,
+      child: Center(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          for (final (tumble, label) in [(0.0, 'tumble: 0'), (.02, 'tumble: 0.02'), (.04, 'tumble: 0.04'), (.065, 'tumble: 0.065')])
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 30),
+              child: SeaGlassSurface(
+                width: 260,
+                height: 96,
+                shape: SeaGlassShape.capsule,
+                palette: lagoonPill,
+                style: pillStyle.copyWith(tumble: tumble, seed: 7),
+                child: Text(label, style: const TextStyle(fontSize: 22)),
+              ),
+            ),
         ]),
       ),
     );
