@@ -1,5 +1,5 @@
-// Renders each example page with the real shader and saves PNG screenshots to
-// doc/screenshots. Run: flutter test test/screenshot_test.dart
+// Renders each example page with the real shader and saves PNG screenshots
+// to doc/screenshots. Run: flutter test test/screenshot_test.dart
 // Fonts come from the Flutter SDK cache (Roboto and Material Icons).
 import 'dart:io';
 import 'dart:ui' as ui;
@@ -29,7 +29,7 @@ void main() {
       addTearDown(tester.view.reset);
       final boundary = GlobalKey();
       await tester.pumpWidget(RepaintBoundary(key: boundary, child: app));
-      // Let shader loading and geometry builds finish (they run in the real zone).
+      // Let shader loading and geometry builds finish; they run in the real zone.
       for (var i = 0; i < 40; i++) {
         await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 100)));
         await tester.pump();
@@ -46,7 +46,7 @@ void main() {
   }
 }
 
-/// The same pill with the ground light falling in four directions.
+/// The same pill with the ground light in a few directions and tints.
 class ShadowDirections extends StatelessWidget {
   const ShadowDirections({super.key});
 

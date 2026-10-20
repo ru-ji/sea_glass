@@ -10,19 +10,19 @@ import 'material_field.dart';
 import 'random.dart';
 import 'style.dart';
 
-/// Unit vector for a ground-light direction in degrees (180 = down). Values
-/// within rounding of an axis are snapped, so 180 gives exactly (0, 1).
+/// Unit vector for a ground-light angle in degrees, where 180 points down.
+/// Values close to an axis snap to it, so 180 gives exactly (0, 1).
 Offset shadowVector(double degrees) {
   final theta = degrees * math.pi / 180.0;
   double snap(double v) => v.abs() < 1e-9 ? 0.0 : (v - v.sign).abs() < 1e-9 ? v.sign : v;
   return Offset(snap(math.sin(theta)), snap(-math.cos(theta)));
 }
 
-/// Transparent gutter the material may draw into outside its layout box.
+/// Transparent space the material can paint into outside its layout box.
 const double kSeaGlassPadding = 48.0;
 
-/// Loads the fragment program once. Resolves to null if shaders are unavailable
-/// (unsupported backend, unit tests); painters then draw only the ground light.
+/// Loads the fragment program once. Returns null when shaders are not available
+/// (unsupported backend, unit tests). Painters then draw only the ground light.
 class SeaGlassShaderProgram {
   SeaGlassShaderProgram._();
 
@@ -34,11 +34,11 @@ class SeaGlassShaderProgram {
 
   static ui.FragmentProgram? get loaded => _program;
 
-  /// True once loading finished without a usable program.
+  /// True when loading has finished and there is no usable program.
   static bool get failed => _failed;
 
   static Future<ui.FragmentProgram?> load() => _loading ??= () async {
-        // The package-relative key applies inside this package's own tests.
+        // The short key is needed when running this package's own tests.
         for (final key in const [asset, 'shaders/sea_glass.frag']) {
           try {
             return _program = await ui.FragmentProgram.fromAsset(key);
@@ -76,7 +76,7 @@ class LiveGeometry {
   final int width, height;
   final double gradientScaleA, gradientScaleB;
 
-  /// A handle sharing the same GPU images; dispose each handle independently.
+  /// Another handle to the same GPU images. Dispose each handle on its own.
   LiveGeometry clone() => LiveGeometry(key, path, a.clone(), b.clone(), width, height, gradientScaleA, gradientScaleB);
 
   int get byteSize => width * height * 16 * 2;
@@ -87,9 +87,9 @@ class LiveGeometry {
   }
 }
 
-/// Shared LRU of immutable geometry (like the reference's
-/// sharedLiveMaterialGeometryCache): up to 32 entries within a texture budget.
-/// Matching pieces, revisited screens and precached sizes draw on first paint.
+/// Shared LRU of read-only geometry, like the original's
+/// sharedLiveMaterialGeometryCache. It holds up to 32 entries within a texture
+/// budget, so repeats, revisited screens and precached sizes draw on first paint.
 class SeaGlassGeometryCache {
   SeaGlassGeometryCache._();
 
@@ -99,7 +99,7 @@ class SeaGlassGeometryCache {
   static final Map<GeometryKey, Future<LiveGeometry?>> _building = {};
   static int _bytes = 0;
 
-  /// A new handle to a cached geometry, or null.
+  /// A fresh handle to cached geometry, or null.
   static LiveGeometry? lookup(GeometryKey key) {
     final g = _entries.remove(key);
     if (g == null) return null;
@@ -107,15 +107,14 @@ class SeaGlassGeometryCache {
     return g.clone();
   }
 
-  /// Builds (once per key) and caches; resolves to a new handle.
+  /// Builds the geometry once per key, caches it and returns a new handle.
   static Future<LiveGeometry?> obtain(GeometryKey key) async {
     final hit = lookup(key);
     if (hit != null) return hit;
     final g = await (_building[key] ??= SeaGlassGeometryController._build(key)
       ..whenComplete(() => _building.remove(key)));
     if (g == null) return null;
-    // Every awaiter of a shared build gets its own handle before eviction can
-    // dispose the cached entry.
+    // Each caller gets its own handle before eviction can dispose the cached one.
     final handle = g.clone();
     if (!_entries.containsKey(key)) {
       _entries[key] = g;
@@ -130,7 +129,7 @@ class SeaGlassGeometryCache {
     return handle;
   }
 
-  /// Releases every cached geometry. Live pieces keep their own handles.
+  /// Frees every cached geometry. Pieces that are still alive keep their handles.
   static void clear() {
     for (final g in _entries.values) {
       g.dispose();
@@ -140,10 +139,11 @@ class SeaGlassGeometryCache {
   }
 }
 
-/// Owns one piece's geometry (port of LiveMaterialRenderer's update model):
-/// the last complete geometry stays visible while edits are prepared off the
-/// paint path; one build is active and only the newest request is kept pending.
-/// It also owns the piece's reusable shader and its rasterized ground light.
+/// Owns one piece's geometry. This follows LiveMaterialRenderer's update model:
+/// the last complete geometry stays on screen while the next one is built away
+/// from the paint path. Only one build runs at a time, and only the newest
+/// request waits behind it. The controller also owns the piece's shader and its
+/// rasterized ground light.
 class SeaGlassGeometryController extends ChangeNotifier {
   LiveGeometry? _displayed;
   GeometryKey? _active, _pending, _latest;
@@ -159,8 +159,8 @@ class SeaGlassGeometryController extends ChangeNotifier {
     return GeometryKey(size.width, size.height, shape, style.tumble, style.seed, fieldScale);
   }
 
-  /// Outline for clipping and ground light: the displayed geometry's when it
-  /// matches the size, otherwise the requested outline (computed synchronously).
+  /// Outline used for clipping and the ground light. If the displayed geometry
+  /// matches the size, use its path; otherwise compute the requested one now.
   Path pathFor(Size size, SeaGlassShape shape, SeaGlassStyle style) {
     final d = _displayed;
     if (d != null && d.key.sameSize(size)) return d.path;
@@ -172,7 +172,7 @@ class SeaGlassGeometryController extends ChangeNotifier {
   static Path _outline(GeometryKey k) => contourToPath(
       contourSegments(buildContour(k.widthDp, k.heightDp, shape: k.shape, tumble: k.tumble, seed: k.seed)));
 
-  /// The last complete geometry, whatever its size.
+  /// The last complete geometry, at whatever size it was built.
   LiveGeometry? get displayed => _displayed;
 
   LiveGeometry? displayedFor(Size size) {
@@ -180,7 +180,7 @@ class SeaGlassGeometryController extends ChangeNotifier {
     return d != null && d.key.sameSize(size) ? d : null;
   }
 
-  /// Whether building this geometry failed (for example, no float textures).
+  /// True if this geometry could not be built, for example without float textures.
   bool failedFor(Size size, SeaGlassShape shape, SeaGlassStyle style) =>
       _failed.contains(keyFor(size, shape, style));
 
@@ -192,9 +192,9 @@ class SeaGlassGeometryController extends ChangeNotifier {
       _pending = null;
       return;
     }
-    // A failed key is not retried on every repaint.
+    // Do not retry a failed key on every repaint.
     if (_failed.contains(key)) return;
-    // Cached geometry applies synchronously, during this paint.
+    // Cached geometry can be used right away, during this paint.
     final cached = SeaGlassGeometryCache.lookup(key);
     if (cached != null) {
       _displayed?.dispose();
@@ -223,7 +223,7 @@ class SeaGlassGeometryController extends ChangeNotifier {
         _displayed?.dispose();
         _displayed = g;
       } else {
-        // A -> B(active) -> A keeps A: the latest request is already shown.
+        // A -> B (building) -> A keeps A, because the latest request is already shown.
         g.dispose();
       }
       final next = _pending;
@@ -233,7 +233,7 @@ class SeaGlassGeometryController extends ChangeNotifier {
     });
   }
 
-  /// One shader per piece; only its uniforms change between frames.
+  /// One shader per piece. Only the uniforms change between frames.
   ui.FragmentShader shaderFor(ui.FragmentProgram program) {
     if (_shaderProgram != program) {
       _shader?.dispose();
@@ -243,8 +243,8 @@ class SeaGlassGeometryController extends ChangeNotifier {
     return _shader!;
   }
 
-  /// The three blurred ground layers, rasterized once per input change (like
-  /// RealtimeGround's recorded layers) instead of re-blurred every frame.
+  /// The three blurred ground layers. They are rasterized once per change, like
+  /// RealtimeGround's recorded layers, instead of being blurred on every frame.
   ui.Image groundFor(Path path, Size size, SeaGlassStyle s, SeaGlassPalette palette, double pixelRatio) {
     final key = _GroundKey(path, size, s.thickness, s.bulge, s.frost, s.elevation, s.transmission,
         palette.body.toARGB32() & 0xFFFFFF, pixelRatio, s.shadowDegrees, s.shadowTinted);
@@ -331,7 +331,7 @@ class _GroundImage {
   final ui.Image image;
 }
 
-/// Paints the three ground-light layers and the glass body.
+/// Paints the glass body and the three ground-light layers.
 class SeaGlassPainter extends CustomPainter {
   SeaGlassPainter({
     required this.style,
@@ -348,7 +348,7 @@ class SeaGlassPainter extends CustomPainter {
   final SeaGlassGeometryController controller;
   final ui.FragmentProgram? program;
 
-  /// Resolution of the cached ground-light image.
+  /// Pixel ratio used for the cached ground-light image.
   final double devicePixelRatio;
 
   @override
@@ -357,17 +357,17 @@ class SeaGlassPainter extends CustomPainter {
     final s = style.normalized();
     final p = program;
     if (p == null || controller.failedFor(size, shape, s)) {
-      // Without a shader (or float textures) draw a flat body instead of
-      // nothing; while the shader is still loading, draw nothing yet.
+      // Without a shader or float textures, draw a flat body instead of nothing.
+      // While the shader is still loading, draw nothing.
       if (SeaGlassShaderProgram.failed || p != null) _paintFlat(canvas, size, s);
       return;
     }
     controller.request(size, shape, s);
     final exact = controller.displayedFor(size);
     final geometry = exact ?? controller.displayed;
-    // Never show a partial piece: ground and body appear together. While a
-    // resized geometry is prepared, the previous one is stretched to fit, so
-    // animated sizes do not blink; it keeps its own seed and tumble.
+    // Never show half a piece: ground and body appear together. While a new
+    // size is being built, the previous geometry is stretched to fit, so
+    // animated sizes do not blink. It keeps its own seed and tumble.
     if (geometry == null) return;
     final own = Size(geometry.key.widthDp, geometry.key.heightDp);
     canvas.save();
@@ -418,7 +418,7 @@ class SeaGlassPainter extends CustomPainter {
       devicePixelRatio != old.devicePixelRatio;
 }
 
-/// Clips children to the displayed tumbled outline.
+/// Clips children to the tumbled outline that is currently displayed.
 class SeaGlassClipper extends CustomClipper<Path> {
   SeaGlassClipper(this.controller, this.style, this.shape) : super(reclip: controller);
   final SeaGlassGeometryController controller;
@@ -432,8 +432,9 @@ class SeaGlassClipper extends CustomClipper<Path> {
   bool shouldReclip(SeaGlassClipper old) => style != old.style || shape != old.shape;
 }
 
-/// composeMaskRasterizer: white source-over on transparent, antialiased,
-/// path scaled by [scale] and offset by one pixel. Returns alpha bytes.
+/// Port of composeMaskRasterizer. Draws the path scaled by [scale] and offset
+/// by one pixel, antialiased, in white source-over on transparent. Returns the
+/// alpha channel.
 Future<Uint8List> rasterizeMask(List<ContourSegment> segments, int columns, int rows, double scale) async {
   final recorder = ui.PictureRecorder();
   Canvas(recorder)
@@ -453,24 +454,24 @@ Future<Uint8List> rasterizeMask(List<ContourSegment> segments, int columns, int 
   return coverage;
 }
 
-/// Opaque float RGBA keeps the encoded fields out of color conversion. Values
-/// are first rounded to IEEE binary16, because the reference uploads RGBA_F16
-/// on every platform; the GPU then samples exactly the same texel values.
+/// Opaque float RGBA keeps the encoded fields away from colour conversion.
+/// Values are rounded to IEEE binary16 first, since the original uploads
+/// RGBA_F16 on every platform. The GPU then samples the same texel values.
 Future<ui.Image> uploadFloatTexture(Float32List data, int width, int height) {
   final rounded = Float32List(data.length);
   for (var i = 0; i < data.length; i++) {
     rounded[i] = halfToFloat(float16Bits(data[i]));
   }
   final done = Completer<ui.Image>();
-  // Request a float texture explicitly: with the default (dontCare) a backend
-  // may store 8-bit channels, which would quantize the encoded gradients.
+  // Ask for a float texture explicitly. With the default (dontCare), a backend
+  // may store 8-bit channels and quantize the encoded gradients.
   ui.decodeImageFromPixels(rounded.buffer.asUint8List(), width, height, ui.PixelFormat.rgbaFloat32,
       done.complete, targetFormat: ui.TargetPixelFormat.rgbaFloat32);
   return done.future;
 }
 
-/// Binds the geometry textures and sets every uniform of sea_glass.frag in
-/// declaration order, with the same values LiveMaterialRenderer uses.
+/// Binds the geometry textures and sets every sea_glass.frag uniform in
+/// declaration order, using the same values as LiveMaterialRenderer.
 void configureBodyShader(
   ui.FragmentShader shader,
   ui.Image geometryA,
@@ -516,7 +517,7 @@ void configureBodyShader(
 
 final ByteData _bits = ByteData(4);
 
-/// IEEE binary16, round-to-nearest-even (port of the reference float16Bits).
+/// IEEE binary16 with round-to-nearest-even (port of the original float16Bits).
 int float16Bits(double value) {
   _bits.setFloat32(0, value);
   final bits = _bits.getUint32(0);
@@ -549,14 +550,14 @@ double halfToFloat(int h) {
   return sign * (1 + mantissa / 1024) * math.pow(2, exponent - 15);
 }
 
-/// Port of RealtimeGround: three layers in the original order, each drawn
-/// into its own layer and blurred as a whole (Gaussian sigma, decal tiling).
+/// Port of RealtimeGround. Draws the three layers in the original order, each
+/// in its own layer, then blurs the whole layer (Gaussian sigma, decal tiling).
 void paintGround(Canvas canvas, Path path, Size size, SeaGlassStyle s, SeaGlassPalette palette) {
   final short = math.min(size.width, size.height);
   final t = s.transmission;
   final bounds = Rect.fromLTWH(-kSeaGlassPadding, -kSeaGlassPadding,
       size.width + kSeaGlassPadding * 2, size.height + kSeaGlassPadding * 2);
-  // Compose converts these float alphas to 8-bit color with rounding.
+  // Compose rounds these float alphas to 8-bit colour.
   Color argb(double alpha, int rgb) => Color(((f32(alpha) * 255).round() << 24) | rgb);
   final body = palette.body.toARGB32();
   // Extension: tinted shadows use the pigment at 40% brightness.
@@ -596,24 +597,24 @@ void paintGround(Canvas canvas, Path path, Size size, SeaGlassStyle s, SeaGlassP
       math.min(22.0, s.thickness * 0.42 + travel),
       math.min(8.0, 2.8 + short * 0.033 + s.frost * 1.6),
       Paint()
-        // The opacity ramp runs across the body along the ground-light
-        // direction; for 180 degrees this is top (0) to bottom (height).
+        // The opacity ramp follows the ground-light direction across the body.
+        // At 180 degrees it runs from the top (0) to the bottom (height).
         ..shader = ui.Gradient.linear(
           _spanPoint(direction, 0),
           _spanPoint(direction, 1),
           [argb(0, tintRgb), argb(t * 0.06, tintRgb), argb(t * 0.48, tintRgb), argb(t * 0.94, tintRgb)],
           const [0.0, 0.45, 0.75, 1.0],
           TileMode.clamp,
-          // Unit-box coordinates scaled to the body, like the shader's travel.
+          // Unit-box coordinates scaled to the body, matching the shader's travel.
           Matrix4.diagonal3Values(size.width, size.height, 1).storage,
         ),
     );
   }
 }
 
-/// The point of the unit box where the projection on [direction] is at
-/// fraction [t] of its range, on the center line ((0.5, 0) to (0.5, 1) for
-/// 180°). A diagonal direction therefore runs corner to corner.
+/// The point in the unit box where the projection onto [direction] is at
+/// fraction [t] of its range. On the centre line this runs from (0.5, 0) to
+/// (0.5, 1) at 180 degrees, so a diagonal direction goes corner to corner.
 Offset _spanPoint(Offset direction, double t) {
   final extent = direction.dx.abs() + direction.dy.abs();
   return const Offset(0.5, 0.5) + direction * ((t - 0.5) * extent);

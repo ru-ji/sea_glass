@@ -1,8 +1,8 @@
-// Parity against the ORIGINAL Kotlin implementation (mttmcknn/sea-glass).
-// Fixtures in test/fixtures/kotlin (revision in REVISION) were produced by tool/kotlin_reference,
-// which compiles the original geometry sources unchanged and renders the
-// original SeaGlassBodyShader through Skia. Regenerate with
-// tool/kotlin_reference/export.sh.
+// Parity checks against the original Kotlin implementation (mttmcknn/sea-glass).
+// The fixtures in test/fixtures/kotlin (revision in REVISION) come from
+// tool/kotlin_reference, which compiles the original geometry sources
+// unchanged and renders the original SeaGlassBodyShader through Skia.
+// Regenerate them with tool/kotlin_reference/export.sh.
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
@@ -32,7 +32,7 @@ class Case {
         bulge: n('bulge'), elevation: n('elevation'), lightDegrees: n('light'),
         transmission: n('transmission'), seed: i('seed'),
       );
-  /// Geometry uses the unrounded Double scale; only the shader uniform is Float.
+  /// Geometry uses the unrounded double scale. Only the shader uniform is Float.
   double get fieldScale => math.min(1.0, math.sqrt(262144.0 / (n('width') * n('height'))));
   Uint8List bytes(String name) =>
       Uint8List.fromList(gzip.decode(File('$fixtures/$id/$name.gz').readAsBytesSync()));
@@ -84,7 +84,7 @@ Future<Uint8List> renderBody(Case c, ui.Image a, ui.Image b, double gradA, doubl
   return data.buffer.asUint8List();
 }
 
-/// Compares two premultiplied RGBA renders on fully covered pixels and on all pixels.
+/// Compares two premultiplied RGBA renders: fully covered pixels and all pixels.
 (Diff, Diff) compareRgba(Uint8List actual, Uint8List expected) {
   final interior = Diff(), all = Diff();
   for (var p = 0; p < expected.length; p += 4) {
@@ -100,7 +100,7 @@ void main() {
   for (final c in cases) {
     group(c.id, () {
       test('contour segments match the Kotlin geometry inputs', () {
-        // Segment counts and texture sizes come from the same contour/budget code.
+        // Segment counts and texture sizes come from the same contour and budget code.
         final fieldScale = c.fieldScale;
         expect(f32(fieldScale), f32(c.n('fieldScale')));
         expect(math.max(1, (c.n('width') * fieldScale).ceil()), c.i('textureWidth'));
@@ -157,8 +157,8 @@ void main() {
       });
 
       testWidgets('shading uses local coordinates (drawn at an offset)', (tester) async {
-        // Fragment coordinates must follow the canvas transform, as they do for
-        // the reference's local shader coordinates.
+        // Fragment coordinates must follow the canvas transform, matching the
+        // original's local shader coordinates.
         const offset = Offset(23, 11);
         final program = await tester.runAsync(SeaGlassShaderProgram.load);
         final w = c.i('textureWidth'), h = c.i('textureHeight');
@@ -173,7 +173,7 @@ void main() {
         for (var y = 0; y < ph; y++) {
           for (var x = 0; x < pw; x++) {
             final i = (y * pw + x) * 4, j = ((y + offset.dy.toInt()) * stride + x + offset.dx.toInt()) * 4;
-            // Interior only: moving a path can shift edge antialiasing slightly.
+            // Interior only: moving a path can shift edge antialiasing a little.
             if (expected[i + 3] != 255 || pixels[j + 3] != 255) continue;
             for (var ch = 0; ch < 4; ch++) {
               d.add(pixels[j + ch], expected[i + ch]);
@@ -194,9 +194,9 @@ void main() {
           final image = await recorder.endRecording().toImage(pw, ph);
           return (await image.toByteData(format: ui.ImageByteFormat.rawRgba))!.buffer.asUint8List();
         }))!;
-        // Without blur, alpha is identical and premultiplied color still differs
+        // Without blur the alpha matches, but premultiplied colour still differs
         // by a few levels: the two Skia builds round translucent blending
-        // differently. Allow 3/255 per channel; everything else is exact.
+        // differently. Allow 3/255 per channel; everything else must be exact.
         final ground = Diff();
         final expected = c.bytes('ground.rgba');
         for (var i = 0; i < expected.length; i++) {
@@ -231,7 +231,7 @@ void main() {
 
   group('shadow direction and tint (extension)', () {
     // The Kotlin exporter applies the same extension to the original
-    // RealtimeGround code path (renderGroundExtended); compare against it.
+    // RealtimeGround code path (renderGroundExtended), so compare against that.
     const variants = [(90.0, false), (135.0, false), (0.0, false), (270.0, false), (180.0, true), (135.0, true)];
     for (final c in cases.where((c) => c.id == 'lagoon-rounded' || c.id == 'mint-disc')) {
       for (final (degrees, tinted) in variants) {

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:sea_glass/sea_glass.dart';
 
-/// A single large glass pill: glittering grain, a glowing lower edge and
-/// colored light transmitted onto the ground beneath it.
+/// One large glass pill: glittery grain, a glowing lower edge and coloured
+/// light spilling onto the ground below.
 class PillPage extends StatefulWidget {
   const PillPage({super.key});
 

@@ -9,40 +9,84 @@ import '../pages/quick_settings_page.dart';
 /// Total length of the promo loop.
 const promoDuration = Duration(seconds: 8);
 
-/// A vertical (9:16) presentation of the package, driven entirely by [t]
-/// (seconds since the start), so every frame is deterministic. The last frame
-/// fades back to the empty background of the first, for a seamless loop.
+/// The full release loop, plus three shorter teaser clips.
+enum PromoClip {
+  button(Duration(milliseconds: 5500)),
+  screen(Duration(milliseconds: 5000)),
+  tumble(Duration(milliseconds: 7000), Size(360, 780)), // 1080 x 2340 phone screen
+  release(promoDuration);
+
+  const PromoClip(this.duration, [this.size = const Size(360, 640)]);
+  final Duration duration;
+
+  /// Logical size. Rendered at 3x.
+  final Size size;
+}
+
+/// A 9:16 walkthrough of the package, driven entirely by [t] (seconds since
+/// the start), so every frame is deterministic. The last frame fades back to
+/// the empty background of the first, so the loop joins cleanly.
 ///
-/// 0.0–1.7  title, and a pill dropping into place
-/// 1.5–3.6  Quick Settings tiles light up, the brightness slider moves
-/// 3.5–5.6  the shadow turns (shadowDegrees) and takes the tint (shadowTinted)
-/// 5.5–7.1  palettes, then a Material 3 theme
-/// 7.0–8.0  the one-line API, then fade out
+/// 0.0-1.7  title, and a pill dropping into place
+/// 1.5-3.6  Quick Settings tiles light up, the brightness slider moves
+/// 3.5-5.6  the shadow turns (shadowDegrees) and takes the tint (shadowTinted)
+/// 5.5-7.1  palettes, then a Material 3 theme
+/// 7.0-8.0  the one-line API, then fade out
 class PromoScene extends StatelessWidget {
-  const PromoScene({super.key, required this.t});
+  const PromoScene({super.key, required this.t, this.clip = PromoClip.release});
 
   final double t;
+  final PromoClip clip;
 
   static const background = Color(0xFFEEF3F2);
   static const ink = Color(0xFF17302F);
 
   @override
   Widget build(BuildContext context) {
-    // Material provides the theme's text style (and no debug underline).
+    if (clip == PromoClip.tumble) return _TumbleCapture(t: t);
+    // Material supplies the text style, and there is no debug underline.
     return Material(
       color: background,
       child: DefaultTextStyle.merge(
         style: const TextStyle(color: ink),
         child: LayoutBuilder(builder: (context, constraints) {
           final size = constraints.biggest;
-          return Stack(children: [
-            _scene(0.0, 1.7, (p) => _Title(t: t)),
-            _scene(1.5, 3.6, (p) => _QuickSettings(t: t)),
-            _scene(3.5, 5.6, (p) => _Shadow(t: t, size: size)),
-            _scene(5.5, 7.1, (p) => _Palettes(t: t, size: size)),
-            _scene(7.0, 8.0, (p) => _Code(t: t)),
-            _caption(),
-          ]);
+          // The teaser clips reuse the release scenes with a time shift.
+          return Stack(children: switch (clip) {
+            PromoClip.button => [
+                _scene(0.0, 3.1, (p) => _StartButton(t: t)),
+                _scene(3.0, 4.6, (p) => _Palettes(t: t + 2.6, size: size)),
+                _scene(4.5, 5.5, (p) => _Code(t: t)),
+                _caption(const [
+                  (0.3, 1.5, 'A button made of sea glass'),
+                  (1.7, 2.9, 'Press it.'),
+                  (3.1, 4.5, 'Any palette, or your Material 3 theme'),
+                  (4.6, 5.3, 'One widget.'),
+                ]),
+              ],
+            PromoClip.screen => [
+                _scene(0.0, 2.9, (p) => _QuickSettings(t: t + 1.6)),
+                _scene(2.8, 5.0, (p) => _Shadow(t: t + .8, size: size)),
+                _caption(const [
+                  (0.2, 2.7, 'Quick Settings, made of glass'),
+                  (3.0, 4.8, 'Choose where the shadow falls'),
+                ]),
+              ],
+            _ => [ // full release
+                _scene(0.0, 1.7, (p) => _Title(t: t)),
+                _scene(1.5, 3.6, (p) => _QuickSettings(t: t)),
+                _scene(3.5, 5.6, (p) => _Shadow(t: t, size: size)),
+                _scene(5.5, 7.1, (p) => _Palettes(t: t, size: size)),
+                _scene(7.0, 8.0, (p) => _Code(t: t)),
+                _caption(const [
+                  (0.3, 1.6, 'Frosted, softly tumbled glass'),
+                  (1.7, 3.5, 'Quick Settings, made of glass'),
+                  (3.7, 5.5, 'Choose where the shadow falls'),
+                  (5.7, 7.0, 'Any palette, or your Material 3 theme'),
+                  (7.1, 7.8, 'One widget.'),
+                ]),
+              ],
+          });
         }),
       ),
     );
@@ -65,14 +109,7 @@ class PromoScene extends StatelessWidget {
     );
   }
 
-  Widget _caption() {
-    const captions = [
-      (0.3, 1.6, 'Frosted, softly tumbled glass'),
-      (1.7, 3.5, 'Quick Settings, made of glass'),
-      (3.7, 5.5, 'Choose where the shadow falls'),
-      (5.7, 7.0, 'Any palette, or your Material 3 theme'),
-      (7.1, 7.8, 'One widget.'),
-    ];
+  Widget _caption(List<(double, double, String)> captions) {
     for (final (start, end, text) in captions) {
       if (t >= start && t <= end) {
         final o = math.min(_ease(_progress(t, start, start + .3)), 1 - _ease(_progress(t, end - .25, end)));
@@ -137,6 +174,136 @@ class _Title extends StatelessWidget {
   }
 }
 
+/// Looks like a screen recording of the Playground tab: a finger drags the
+/// Tumble slider and then Frost, and the glass reshapes as it goes.
+class _TumbleCapture extends StatelessWidget {
+  const _TumbleCapture({required this.t});
+  final double t;
+
+  @override
+  Widget build(BuildContext context) {
+    double move(double a, double b, double from, double to) =>
+        from + (to - from) * Curves.easeInOut.transform(_progress(t, a, b));
+    // Steps of .001, so each value's outline is built only once.
+    final tumble = (move(3.2, 4.2, move(0.8, 2.6, 0, .065), .025) * 1000).round() / 1000;
+    final frost = (move(4.8, 6.2, .55, 1) * 100).round() / 100;
+    final style = SeaGlassStyle.reference.copyWith(tumble: tumble, frost: frost);
+    final touchTumble = t > .6 && t < 4.4;
+    final touchFrost = t > 4.6 && t < 6.4;
+    Widget slider(String label, double value, double max, bool touched) => Row(children: [
+          SizedBox(width: 64, child: Text(label)),
+          Expanded(
+            child: LayoutBuilder(builder: (context, c) {
+              final x = 24 + (c.maxWidth - 48) * value / max;
+              return Stack(clipBehavior: Clip.none, alignment: Alignment.centerLeft, children: [
+                Slider(value: value, max: max, onChanged: (_) {}),
+                if (touched)
+                  Positioned(
+                    left: x - 18,
+                    child: Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.black.withValues(alpha: .18),
+                          border: Border.all(color: Colors.white.withValues(alpha: .7), width: 2)),
+                    ),
+                  ),
+              ]);
+            }),
+          ),
+          SizedBox(width: 44, child: Text(value.toStringAsFixed(3), style: const TextStyle(fontSize: 11))),
+        ]);
+    return Theme(
+      data: ThemeData(colorSchemeSeed: const Color(0xFF1E6F7C), useMaterial3: true),
+      child: Scaffold(
+        backgroundColor: const Color(0xFFF7F4EF),
+        body: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(24, 48, 24, 0),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              const Spacer(),
+              Center(
+                child: SeaGlassButton(
+                  onPressed: () {},
+                  width: 240,
+                  height: 80,
+                  palette: SeaGlassPalette.lagoon,
+                  style: style.copyWith(seed: 33),
+                  child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                    Icon(Icons.edit_outlined), SizedBox(width: 12), Text('Compose', style: TextStyle(fontSize: 20)),
+                  ]),
+                ),
+              ),
+              const SizedBox(height: 36),
+              Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                for (final (i, p) in [SeaGlassPalette.lilac, SeaGlassPalette.amber, SeaGlassPalette.mint].indexed)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: SeaGlassSurface(
+                      width: 72,
+                      height: 72,
+                      shape: SeaGlassShape.disc,
+                      palette: p,
+                      style: style.copyWith(seed: 12 + i),
+                      child: Icon([Icons.add, Icons.favorite_border, Icons.music_note][i]),
+                    ),
+                  ),
+              ]),
+              const Spacer(),
+              slider('Tumble', tumble, .065, touchTumble),
+              slider('Frost', frost, 1, touchFrost),
+              const SizedBox(height: 16),
+            ]),
+          ),
+        ),
+        bottomNavigationBar: NavigationBar(
+          selectedIndex: 2,
+          destinations: const [
+            NavigationDestination(icon: Icon(Icons.tune), label: 'Quick settings'),
+            NavigationDestination(icon: Icon(Icons.smart_button_outlined), label: 'Pill'),
+            NavigationDestination(icon: Icon(Icons.science_outlined), label: 'Playground'),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// A frosted Start button drops in, gets pressed (2 px offset, as in
+/// SeaGlassButton) and turns lagoon.
+class _StartButton extends StatelessWidget {
+  const _StartButton({required this.t});
+  final double t;
+
+  @override
+  Widget build(BuildContext context) {
+    final drop = Curves.easeOutBack.transform(_progress(t, 0.1, 1.0));
+    final pressed = t > 1.8 && t < 2.0;
+    final on = t >= 2.0;
+    return Column(children: [
+      const Spacer(flex: 3),
+      Opacity(
+        opacity: _ease(_progress(t, 0.1, 0.4)),
+        child: Transform.translate(
+          offset: Offset(0, (1 - drop) * -70 + (pressed ? 2 : 0)),
+          child: SeaGlassSurface(
+            width: 240,
+            height: 72,
+            shape: SeaGlassShape.capsule,
+            palette: on ? lagoonPill : frosted,
+            style: pillStyle.copyWith(seed: 33),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              Icon(on ? Icons.check : Icons.play_arrow_rounded, size: 26, color: (on ? lagoonPill : frosted).ink),
+              const SizedBox(width: 8),
+              Text(on ? 'Started' : 'Start', style: TextStyle(fontSize: 26, color: (on ? lagoonPill : frosted).ink)),
+            ]),
+          ),
+        ),
+      ),
+      const Spacer(flex: 4),
+    ]);
+  }
+}
+
 class _QuickSettings extends StatelessWidget {
   const _QuickSettings({required this.t});
   final double t;
@@ -188,7 +355,7 @@ class _Shadow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 180° → 90° → 135°, then the tint switches on.
+    // 180 to 90 to 135 degrees, then the tint switches on.
     final turn = Curves.easeInOut.transform(_progress(t, 3.8, 4.5));
     final settle = Curves.easeInOut.transform(_progress(t, 4.5, 5.0));
     final degrees = (180 - 90 * turn + 45 * settle).roundToDouble();
@@ -228,7 +395,7 @@ class _Palettes extends StatelessWidget {
   Widget build(BuildContext context) {
     final material = SeaGlassPalette.fromColorScheme(ColorScheme.fromSeed(seedColor: const Color(0xFF3B7D4F)));
     final stops = [(lagoonPill, 'Lagoon'), (lilacPill, 'Lilac'), (amberPill, 'Amber'), (material, 'Material 3')];
-    // Hold each palette, crossfading during the last 0.15 s of its slot.
+    // Hold each palette and crossfade during the last 0.15 s of its slot.
     final slot = _progress(t, 5.6, 7.0) * stops.length;
     final index = slot.floor().clamp(0, stops.length - 1);
     final next = math.min(index + 1, stops.length - 1);

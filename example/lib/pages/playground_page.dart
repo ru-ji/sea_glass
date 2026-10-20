@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:sea_glass/sea_glass.dart';
 
-/// Recipes, palettes, Material 3 colors and live sliders.
+/// Mix recipes, palettes and Material 3 colours, with live sliders.
 class PlaygroundPage extends StatefulWidget {
   const PlaygroundPage({super.key});
 

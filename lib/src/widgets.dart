@@ -7,7 +7,7 @@ import 'painter.dart';
 import 'style.dart';
 import 'theme.dart';
 
-/// Shared state: loads the shader and owns the outline cache for one piece.
+/// Shared state for one piece: loads the shader and owns its geometry controller.
 mixin _GlassState<T extends StatefulWidget> on State<T> {
   final SeaGlassGeometryController cache = SeaGlassGeometryController();
   ui.FragmentProgram? program = SeaGlassShaderProgram.loaded;
@@ -29,9 +29,9 @@ mixin _GlassState<T extends StatefulWidget> on State<T> {
   }
 }
 
-/// Draws the glass material behind [child]. Adds no padding or interaction.
-/// The material paints up to ~48 logical pixels outside the layout box
-/// (shadow and transmitted light); avoid clipping ancestors where possible.
+/// Draws the glass material behind [child]. It adds no padding and no
+/// interaction. The material paints up to 48 logical pixels outside the layout
+/// box (shadow and transmitted light), so try not to clip ancestors.
 class SeaGlass extends StatefulWidget {
   const SeaGlass({
     super.key,
@@ -51,7 +51,7 @@ class SeaGlass extends StatefulWidget {
   final SeaGlassPalette? palette;
   final SeaGlassShape? shape;
 
-  /// Bundle used for any of [style]/[palette]/[shape] left null.
+  /// Fallback bundle for any of [style], [palette] and [shape] left null.
   final SeaGlassComponentStyle? componentStyle;
 
   /// Clip the child to the tumbled outline.
@@ -64,9 +64,9 @@ class SeaGlass extends StatefulWidget {
   @override
   State<SeaGlass> createState() => _SeaGlassState();
 
-  /// Prepares the shader and the geometry for a piece of [size] so it draws
-  /// completely on its first frame (for example before showing a screen).
-  /// Geometry depends only on size, shape, tumble and seed.
+  /// Prepares the shader and the geometry for a piece of [size], so it draws
+  /// completely on the first frame (useful before pushing a screen). Geometry
+  /// depends only on size, shape, tumble and seed.
   static Future<void> precache(
     Size size, {
     SeaGlassStyle style = SeaGlassStyle.reference,
@@ -92,7 +92,7 @@ class _SeaGlassState extends State<SeaGlass> with _GlassState {
     if (content != null && widget.alignment != null) {
       content = Align(alignment: widget.alignment!, child: content);
     }
-    // The material, and the clip, always cover the whole box: padding and
+    // The material and the clip always cover the whole box. Padding and
     // alignment only place the child inside it.
     if (content != null && widget.clipChild) {
       content = ClipPath(clipper: SeaGlassClipper(cache, style, shape), child: content);
@@ -110,7 +110,7 @@ class _SeaGlassState extends State<SeaGlass> with _GlassState {
   }
 }
 
-/// Non-interactive glass container. Content uses the palette ink color.
+/// Non-interactive glass container. Content uses the palette ink colour.
 class SeaGlassSurface extends StatelessWidget {
   const SeaGlassSurface({
     super.key,
@@ -157,8 +157,8 @@ class SeaGlassSurface extends StatelessWidget {
   }
 }
 
-/// Glass button with button semantics, 48 logical pixel minimum target,
-/// keyboard focus outline, disabled state and a 2 px press offset.
+/// Glass button with button semantics, a 48 logical pixel minimum target,
+/// a keyboard focus outline, a disabled state and a 2 px press offset.
 class SeaGlassButton extends StatefulWidget {
   const SeaGlassButton({
     super.key,
@@ -211,9 +211,9 @@ class _SeaGlassButtonState extends State<SeaGlassButton> with _GlassState {
     final shape = widget.shape ?? base.shape;
 
     final pressed = _pressed && _enabled;
-    // Matches the reference: content clipped to the outline, a 4 px centered
-    // focus stroke clipped to a 2 px inner border, the whole piece offset 2 px
-    // while pressed and drawn at 45% opacity when disabled.
+    // Matches the original: content clipped to the outline, a 4 px centred
+    // focus stroke clipped to a 2 px inner border, and the whole piece offset
+    // 2 px while pressed. Disabled pieces draw at 45% opacity.
     final clipper = SeaGlassClipper(cache, style, shape);
     Widget content = ClipPath(
       clipper: clipper,

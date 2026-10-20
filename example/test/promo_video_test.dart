@@ -1,5 +1,5 @@
-// Renders the promo loop frame by frame with the real shader.
-// Opt-in, because it writes 240 frames: use tool/render_promo.sh, or
+// Renders the promo loop frame by frame with the real shader. This is opt-in
+// because it writes hundreds of frames. Use tool/render_promo.sh, or:
 //   flutter test test/promo_video_test.dart --dart-define=RENDER_PROMO=true
 import 'dart:io';
 import 'dart:ui' as ui;
@@ -12,14 +12,15 @@ import 'package:sea_glass_example/promo/promo_scene.dart';
 import 'fonts.dart';
 
 const render = bool.fromEnvironment('RENDER_PROMO');
+final clip = PromoClip.values.byName(const String.fromEnvironment('PROMO_CLIP', defaultValue: 'release'));
 const fps = 30;
-const pixelRatio = 2.0; // 360 x 640 logical -> 720 x 1280
+const pixelRatio = 3.0; // 360 x 640 logical -> 1080 x 1920
 
 void main() {
   setUpAll(loadFonts);
 
   testWidgets('render promo frames', (tester) async {
-    tester.view.physicalSize = const Size(720, 1280);
+    tester.view.physicalSize = clip.size * pixelRatio;
     tester.view.devicePixelRatio = pixelRatio;
     addTearDown(tester.view.reset);
     final out = Directory('build/promo_frames')..createSync(recursive: true);
@@ -29,9 +30,9 @@ void main() {
     final boundary = GlobalKey();
     Future<void> show(double t) => tester.pumpWidget(MaterialApp(
           debugShowCheckedModeBanner: false,
-          home: RepaintBoundary(key: boundary, child: PromoScene(t: t)),
+          home: RepaintBoundary(key: boundary, child: PromoScene(t: t, clip: clip)),
         ));
-    // Let geometry builds (real zone) finish so each frame is complete.
+    // Let the geometry builds finish in the real zone, so each frame is complete.
     Future<void> settle([int rounds = 2]) async {
       for (var i = 0; i < rounds; i++) {
         await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 40)));
@@ -39,8 +40,8 @@ void main() {
       }
     }
 
-    final frames = promoDuration.inMilliseconds * fps ~/ 1000;
-    // Warm-up pass: load the shader and build every geometry once.
+    final frames = clip.duration.inMilliseconds * fps ~/ 1000;
+    // Warm-up pass: load the shader and build each geometry once.
     for (var i = 0; i < frames; i += 6) {
       await show(i / fps);
       await settle(i == 0 ? 20 : 2);

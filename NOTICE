@@ -1,0 +1,15 @@
+sea_glass
+Copyright 2026 THON Hermès
+
+This package is a Flutter port of Sea Glass
+(https://github.com/mttmcknn/sea-glass), licensed under the Apache License 2.0.
+
+Derived from the original:
+- shaders/sea_glass.frag is a translation of SeaGlassBodyShader.kt.
+- lib/src/contour.dart and the geometry and ground-light code port the original
+  Kotlin sources.
+- tool/kotlin_reference/ builds and runs the original sources unchanged.
+
+Changes from the original: rewritten in Dart/GLSL for Flutter; added
+shadowDegrees and shadowTinted (ground light only), Material 3 palettes,
+themes and button widgets.

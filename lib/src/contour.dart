@@ -6,13 +6,13 @@ import 'style.dart';
 
 const double _tau = math.pi * 2.0;
 
-/// One closed cubic segment of the tumbled outline.
+/// One cubic segment of the tumbled outline.
 class ContourSegment {
   const ContourSegment(this.start, this.control1, this.control2, this.end);
   final Offset start, control1, control2, end;
 }
 
-/// Exact port of the reference's seeded, fitted tumbled outline.
+/// Exact port of the original's seeded, fitted tumbled outline.
 List<Offset> buildContour(
   double width,
   double height, {
@@ -123,7 +123,8 @@ List<Offset> buildContour(
   ];
 }
 
-/// Periodic uniform cubic B-spline; exact C2 joins without interpolation overshoot.
+/// Periodic uniform cubic B-spline. The joints are exactly C2, with no
+/// interpolation overshoot.
 List<ContourSegment> contourSegments(List<Offset> points) {
   assert(points.length >= 4);
   final n = points.length;

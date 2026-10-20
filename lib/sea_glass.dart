@@ -1,4 +1,4 @@
-/// Frosted, softly tumbled glass for Flutter.
+/// Sea glass for Flutter: frosted, softly tumbled glass.
 library;
 
 export 'src/style.dart';

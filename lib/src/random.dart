@@ -1,5 +1,5 @@
-/// Mulberry32, matching the reference `SeededRandom` (JavaScript imul and
-/// unsigned shifts, 32-bit wraparound), so seeds give identical streams.
+/// Mulberry32, matching the original `SeededRandom`. It uses JavaScript imul
+/// and unsigned shifts with 32-bit wraparound, so a seed gives the same stream.
 class SeaGlassRandom {
   SeaGlassRandom(int seed) : _value = seed & _mask;
 
@@ -12,7 +12,7 @@ class SeaGlassRandom {
     return _mix(_value);
   }
 
-  /// Read an offset in this stream without consuming the intervening values.
+  /// Read a value at an offset without consuming the values before it.
   double sample(int index) {
     assert(index >= 0);
     return _mix((_value + imul(index + 1, _step)) & _mask);
@@ -25,7 +25,7 @@ class SeaGlassRandom {
 
   SeaGlassRandom copy() => SeaGlassRandom(_value);
 
-  /// 32-bit wrapping multiply, safe on the web (keeps products below 2^53).
+  /// 32-bit wrapping multiply. Works on the web because the products stay below 2^53.
   static int imul(int a, int b) {
     a &= _mask;
     b &= _mask;

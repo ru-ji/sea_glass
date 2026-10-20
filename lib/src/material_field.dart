@@ -5,7 +5,7 @@ import 'random.dart';
 
 final Float32List _f32 = Float32List(1);
 
-/// Round to Float32, matching the reference's `toFloat()` stores.
+/// Rounds to Float32, matching the original's `toFloat()` stores.
 double f32(double v) {
   _f32[0] = v;
   return _f32[0];
@@ -20,7 +20,7 @@ double _tanh(double x) {
   return (e - 1) / (e + 1);
 }
 
-/// Seeded value-noise grid (port of the reference `NoiseGrid`).
+/// Seeded value-noise grid, a port of the original `NoiseGrid`.
 class NoiseGrid {
   NoiseGrid(double width, double height, this.spacing, SeaGlassRandom random,
       {int maxCachedCells = 262144})
@@ -65,8 +65,8 @@ class NoiseGrid {
   }
 }
 
-/// Live cloud field (port of `makeLiveCloudTexture`). Consumes exactly the
-/// fine/micro streams without building them, like the reference.
+/// Live cloud field, ported from `makeLiveCloudTexture`. It consumes exactly
+/// the fine and micro streams without building them, like the original.
 Float32List makeLiveClouds(double widthDp, double heightDp, double scale, int seed, int width, int height) {
   final random = SeaGlassRandom(seed ^ 0x59BF1D7A);
   void skipGrid(double spacing) {
@@ -90,7 +90,7 @@ Float32List makeLiveClouds(double widthDp, double heightDp, double scale, int se
   return clouds;
 }
 
-/// Exact squared Euclidean distance transform, linear in image area.
+/// Exact squared Euclidean distance transform. Runs in linear time.
 void _distanceLine(Float64List input, int length, Float64List output, Int32List sites, Float64List separators) {
   var k = 0;
   sites[0] = 0;
@@ -171,7 +171,7 @@ Float32List _smoothHeight(Float32List values, int width, int height, double scal
   return result;
 }
 
-/// Inputs for [buildGeometryTextures]; plain data so it can cross isolates.
+/// Inputs for [buildGeometryTextures]. Plain data, so it can cross isolates.
 class GeometryRequest {
   const GeometryRequest({
     required this.widthDp,
@@ -186,7 +186,7 @@ class GeometryRequest {
   final double widthDp, heightDp, scale;
   final int seed, width, height;
 
-  /// Antialiased contour alpha, (width + 2) x (height + 2), path offset by 1 px.
+  /// Antialiased contour alpha, (width + 2) by (height + 2), path offset by 1 px.
   final Uint8List coverage;
 }
 
@@ -198,7 +198,8 @@ class GeometryTextures {
   final double gradientScaleA, gradientScaleB;
 }
 
-/// Port of `makeGeometryField` + the texture encoding in `makeLiveMaterialGeometry`.
+/// Port of `makeGeometryField` plus the texture encoding from
+/// `makeLiveMaterialGeometry`.
 GeometryTextures buildGeometryTextures(GeometryRequest r) {
   final w = r.widthDp, h = r.heightDp;
   final width = r.width, height = r.height, scale = r.scale;
@@ -306,7 +307,7 @@ GeometryTextures buildGeometryTextures(GeometryRequest r) {
     }
   }
 
-  // Texture encoding, Float32 arithmetic as in the reference.
+  // Texture encoding, using Float32 arithmetic like the original.
   var maxGradientA = f32(0.005), maxGradientB = f32(0.005);
   for (var i = 0; i < count; i++) {
     if (alpha[i] == 0) continue;

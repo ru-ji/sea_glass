@@ -1,6 +1,6 @@
-// Real-async rendering tests, kept apart from sea_glass_test.dart: widget
+// Real-async rendering tests, kept apart from sea_glass_test.dart. Widget
 // tests there start the shader load inside the fake-async zone, where it
-// never completes.
+// never finishes.
 import 'dart:async';
 
 import 'package:flutter/widgets.dart';
@@ -38,7 +38,7 @@ void main() {
     final c = SeaGlassGeometryController();
     const style = SeaGlassStyle(seed: 101);
     const a = Size(150, 50), b = Size(151, 50);
-    // Requests run in the real zone so their builds can complete.
+    // Requests run in the real zone, so their builds can complete.
     await tester.runAsync(() async => c.request(a, SeaGlassShape.capsule, style));
     await settle(c, tester);
     expect(c.displayedFor(a), isNotNull);

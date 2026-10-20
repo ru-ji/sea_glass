@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:sea_glass/sea_glass.dart';
 
-/// An Android 16 style Quick Settings panel made of sea glass tiles.
+/// A Quick Settings panel in the Android 16 style, built from sea glass tiles.
 class QuickSettingsPage extends StatefulWidget {
   const QuickSettingsPage({super.key});
 
@@ -9,13 +9,13 @@ class QuickSettingsPage extends StatefulWidget {
   State<QuickSettingsPage> createState() => _QuickSettingsPageState();
 }
 
-/// Frosted, almost white glass for inactive tiles.
+/// Frosted, almost white glass for tiles that are off.
 const frosted = SeaGlassPalette(body: Color(0xFFE4EEF0), edge: Color(0xFFFFFFFF), ink: Color(0xFF2B3B3F));
 
-/// Deep teal glass for active tiles.
+/// Deep teal glass for tiles that are on.
 const teal = SeaGlassPalette(body: Color(0xFF1E6F7C), edge: Color(0xFF7FDCE6), ink: Color(0xFFFFFFFF));
 
-/// Precise contours, soft frost and a strong lower light exit.
+/// Tight contours, soft frost and a strong glow along the lower edge.
 const qsStyle = SeaGlassStyle(
   frost: .6, grain: .5, tumble: .006, thickness: 5, bulge: .42, elevation: 9, transmission: .62,
 );
@@ -121,7 +121,7 @@ class _QuickSettingsPageState extends State<QuickSettingsPage> {
   }
 }
 
-/// A Quick Settings tile: a capsule with an icon and an optional label.
+/// One Quick Settings tile: a capsule with an icon and an optional label.
 class QsTile extends StatelessWidget {
   const QsTile({
     super.key,
@@ -183,7 +183,7 @@ class QsTile extends StatelessWidget {
   }
 }
 
-/// Brightness slider: a teal glass fill, a thin handle and a frosted track.
+/// The brightness slider: teal glass fill, a thin handle and a frosted track.
 class GlassSlider extends StatelessWidget {
   const GlassSlider({super.key, required this.value, required this.onChanged});
 
@@ -195,7 +195,7 @@ class GlassSlider extends StatelessWidget {
     return LayoutBuilder(builder: (context, constraints) {
       const height = 56.0, handle = 4.0, spacing = 6.0, minFill = 56.0;
       final width = constraints.maxWidth;
-      // Whole logical pixels keep the number of distinct geometries small.
+      // Whole logical pixels keep the number of distinct geometries low.
       final fill = (minFill + (width - minFill * 2 - handle - spacing * 2) * value).roundToDouble();
       void update(Offset local) => onChanged(((local.dx - minFill) / (width - minFill * 2)).clamp(0.0, 1.0));
       return Semantics(
@@ -254,7 +254,7 @@ class _StatusHeader extends StatelessWidget {
         Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text('10:10', style: TextStyle(fontSize: 46, fontWeight: FontWeight.w500, height: 1)),
           Spacer(),
-          Text('JIO 4G — Jio'),
+          Text('JIO 4G - Jio'),
         ]),
         SizedBox(height: 22),
         Row(children: [

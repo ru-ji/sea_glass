@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
-/// Material recipe. Lengths are logical pixels. Out-of-range values are clamped.
+/// Recipe for one piece of glass. Lengths are logical pixels, and values
+/// outside the documented range get clamped.
 @immutable
 class SeaGlassStyle {
   const SeaGlassStyle({
@@ -17,43 +18,42 @@ class SeaGlassStyle {
     this.shadowTinted = false,
   });
 
-  /// Cloudiness, 0..1.
+  /// How cloudy the glass is, 0..1.
   final double frost;
 
-  /// Microscopic abrasion, 0..1.
+  /// Fine abrasion on the surface, 0..1.
   final double grain;
 
-  /// Contour variation as a fraction of the shorter side, 0..0.065.
+  /// How much the outline wanders, relative to the shorter side (0..0.065).
   final double tumble;
 
-  /// Optical thickness, 0..14.
+  /// Glass thickness, 0..14.
   final double thickness;
 
-  /// Curvature through the body, 0..1.
+  /// How much the body curves, 0..1.
   final double bulge;
 
-  /// Height of the fixed downward shadow, 0..18.
+  /// Height of the shadow on the ground, 0..18.
   final double elevation;
 
-  /// Surface reflection azimuth in degrees. Zero is above; 90 is right.
+  /// Direction of the surface reflection in degrees. Zero is above, 90 is right.
   final double lightDegrees;
 
-  /// Lower light exit and colored ground pool, 0..1.
+  /// Light that leaves through the lower edge and pools on the ground, 0..1.
   final double transmission;
 
-  /// Stable piece identity. Keep it constant across rebuilds.
+  /// Identity of this piece. Keep it the same across rebuilds.
   final int seed;
 
-  /// Direction the ground light falls, in degrees: 180 is down (the
-  /// reference's fixed direction), 90 is right, 0 is up. The cast and contact
-  /// shadows and the transmitted color pool follow it; the glass body itself
-  /// is unchanged. Independent of [lightDegrees], which moves surface
+  /// Direction the ground light falls, in degrees: 180 is down (the original's
+  /// fixed direction), 90 is right, 0 is up. The cast and contact shadows and
+  /// the transmitted colour pool follow it, while the glass body does not
+  /// change. It is separate from [lightDegrees], which moves surface
   /// reflections. This is an extension: the original always casts downward.
   final double shadowDegrees;
 
-  /// Tint the cast and contact shadows with the body pigment (at 40%
-  /// brightness) instead of the reference's neutral gray. Extension; off by
-  /// default.
+  /// Use the body pigment (at 40% brightness) for the cast and contact shadows
+  /// instead of the original's neutral gray. Off by default.
   final bool shadowTinted;
 
   static const SeaGlassStyle reference = SeaGlassStyle();
@@ -85,7 +85,7 @@ class SeaGlassStyle {
         shadowTinted: shadowTinted ?? this.shadowTinted,
       );
 
-  /// The same recipe with every field clamped to its documented range.
+  /// This recipe with every field clamped to its documented range.
   SeaGlassStyle normalized() => SeaGlassStyle(
         frost: _finite(frost, .55).clamp(0.0, 1.0),
         grain: _finite(grain, .48).clamp(0.0, 1.0),
@@ -118,7 +118,7 @@ class SeaGlassStyle {
 
 enum SeaGlassShape { rounded, capsule, disc }
 
-/// Material 3 color roles usable as glass pigment.
+/// Material 3 colour roles you can use as glass pigment.
 enum SeaGlassColorRole {
   primary, secondary, tertiary, error, surface;
 
@@ -139,8 +139,9 @@ enum SeaGlassColorRole {
       };
 }
 
-/// Body pigment, transmitted edge light and a legible foreground.
-/// [body] and [edge] alpha is ignored; translucency comes from the material model.
+/// Pigment for the body, light for the transmitted edge, and a readable
+/// foreground. The alpha of [body] and [edge] is ignored; translucency comes
+/// from the material model.
 @immutable
 class SeaGlassPalette {
   const SeaGlassPalette({required this.body, required this.edge, required this.ink});
@@ -160,8 +161,8 @@ class SeaGlassPalette {
   static const SeaGlassPalette mint = SeaGlassPalette(
       body: Color(0xFFC0DED0), edge: Color(0xFFE6FFF0), ink: Color(0xFF396C5A));
 
-  /// Uses a Material 3 container color as pigment and its on-container color
-  /// as foreground. The edge is the container blended 35% toward white.
+  /// Uses a Material 3 container colour as pigment and its on-container colour
+  /// as foreground. The edge is that colour blended 35% toward white.
   factory SeaGlassPalette.fromColorScheme(ColorScheme scheme,
       [SeaGlassColorRole role = SeaGlassColorRole.primary]) {
     final body = role.container(scheme);
@@ -172,7 +173,7 @@ class SeaGlassPalette {
     );
   }
 
-  /// Reads the ambient Material theme (works with dynamic_color schemes too).
+  /// Reads the ambient Material theme. Dynamic colour schemes work too.
   factory SeaGlassPalette.of(BuildContext context,
           [SeaGlassColorRole role = SeaGlassColorRole.primary]) =>
       SeaGlassPalette.fromColorScheme(Theme.of(context).colorScheme, role);
@@ -185,7 +186,7 @@ class SeaGlassPalette {
   int get hashCode => Object.hash(body, edge, ink);
 }
 
-/// A reusable design-system bundle of recipe, palette and shape.
+/// Recipe, palette and shape grouped together for a design system.
 @immutable
 class SeaGlassComponentStyle {
   const SeaGlassComponentStyle({

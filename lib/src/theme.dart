@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'style.dart';
 
-/// Inheritable defaults. Nested themes override only what they specify.
+/// Defaults that flow down the tree. A nested theme overrides only what it sets.
 class SeaGlassTheme extends StatelessWidget {
   const SeaGlassTheme({super.key, this.style, this.palette, this.shape, required this.child});
 
@@ -11,7 +11,7 @@ class SeaGlassTheme extends StatelessWidget {
   final SeaGlassShape? shape;
   final Widget child;
 
-  /// The ambient defaults, or the library defaults when no theme is above.
+  /// The defaults in scope, or the library defaults when there is no theme above.
   static SeaGlassComponentStyle of(BuildContext context) =>
       context.dependOnInheritedWidgetOfExactType<_SeaGlassScope>()?.data ??
       const SeaGlassComponentStyle();
@@ -34,7 +34,7 @@ class _SeaGlassScope extends InheritedWidget {
   bool updateShouldNotify(_SeaGlassScope old) => data != old.data;
 }
 
-/// Sets the ambient glass palette from the current Material 3 [ColorScheme].
+/// Sets the glass palette from the current Material 3 [ColorScheme].
 class SeaGlassMaterialTheme extends StatelessWidget {
   const SeaGlassMaterialTheme({
     super.key,
