@@ -18,6 +18,12 @@ const pillStyle = SeaGlassStyle(
   frost: .35, grain: .95, tumble: .004, thickness: 10, bulge: .75, elevation: 14, transmission: .9, seed: 3,
 );
 
+/// The pill recipe with less transmitted light and a thinner, dimmer rim, for
+/// smaller pieces where the full glow is too bright.
+const softStyle = SeaGlassStyle(
+  frost: .5, grain: .6, tumble: .004, thickness: 7, bulge: .6, elevation: 10, transmission: .4, seed: 3,
+);
+
 class _PillPageState extends State<PillPage> {
   static const palettes = {'Lagoon': lagoonPill, 'Lilac': lilacPill, 'Amber': amberPill};
   String palette = 'Lagoon';

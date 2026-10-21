@@ -1,3 +1,7 @@
+## 0.2.2
+
+- Updated the docs, screenshots and promo, and refactored the example code.
+
 ## 0.2.1
 
 - Added `SeaGlassStyle.shadowColor`. It sets the cast and contact shadow colour, and its alpha

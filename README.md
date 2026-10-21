@@ -1,31 +1,39 @@
 # sea_glass
 
-Sea Glass gives Flutter widgets the look of frosted, sea-tumbled glass. It brings the
-**Material 4 Sea Glass** concept to Flutter: a fan-made idea of sea glass as the next Material
-Design material, first proposed by [@SLKVinyl](https://x.com/SLKVinyl). It is not an official
-Google design. The rendering is a port of [mttmcknn/sea-glass](https://github.com/mttmcknn/sea-glass)
-(Compose), and it works with today's Material 3 themes.
+Frosted, softly tumbled sea glass for Flutter widgets, drawn with a real shader.
 
-Each piece gets a seeded outline, a fine frost, a soft curve through the body, a bright lower edge
-and coloured light spilling onto the surface below. Text and icons are ordinary widgets; the glass
-is painted behind them.
+It brings the **Material 4 Sea Glass** concept to Flutter: a fan-made idea of sea glass as the next
+Material Design material, first proposed by [@SLKVinyl](https://x.com/SLKVinyl). It is not an
+official Google design. The rendering is a port of
+[mttmcknn/sea-glass](https://github.com/mttmcknn/sea-glass) (Compose).
 
-<p align="center"><img src="doc/screenshots/showcase.png" width="720" alt="Buttons, floating action buttons, an icon bar and labelled pills in several palettes, all drawn with sea glass" /></p>
+<p align="center">
+  <img src="doc/screenshots/music.png" width="240" alt="Sonder, a music player with a mint sea glass play button and control bar" />
+  <img src="doc/screenshots/post.png" width="240" alt="Post, a mail inbox with a sea glass Inbox and Archive switch and Compose button" />
+  <img src="doc/screenshots/nori.png" width="240" alt="Nori, a conversation with lilac sea glass suggestion chips and a frosted input" />
+</p>
 
-<p align="center"><img src="doc/screenshots/toolbars.png" width="720" alt="A tab bar, an input bar, a toolbar with a nested split button, and an icon bar with a rounded action button, all sea glass" /></p>
+## Get started
 
-<p align="center"><img src="doc/screenshots/messages.png" width="720" alt="Message composers with a glass text field and a coloured mic button, on plain and photo backgrounds" /></p>
+```bash
+flutter pub add sea_glass
+```
 
 You need Flutter 3.41 or newer. That is the first release where Impeller accepts float32 textures.
 
 ```dart
 SeaGlassButton(
-  onPressed: compose,
-  palette: SeaGlassPalette.lagoon,
-  style: SeaGlassStyle.reference.copyWith(seed: 33),
-  child: const Text('Compose'),
+  onPressed: play,
+  shape: SeaGlassShape.disc,
+  palette: SeaGlassPalette.mint,
+  style: SeaGlassStyle.quiet,
+  child: const Icon(Icons.play_arrow),
 )
 ```
+
+Each piece gets a seeded outline, a fine frost, a soft curve through the body, a bright lower edge
+and coloured light spilling onto the surface below. Text and icons are ordinary widgets; the glass
+is painted behind them.
 
 ## Widgets
 
@@ -38,10 +46,27 @@ SeaGlassButton(
   override what they set.
 - `SeaGlassComponentStyle` bundles those three so a design system can pass them around.
 
-## Shadow direction and tint
+## Make it yours
 
-These are two additions to the original. Both only touch the ground light, which is the three
-blurred layers in `RealtimeGround`. The glass body itself is unchanged.
+Use `SeaGlassStyle.reference`, `tumbled` or `quiet`, or build your own with
+`copyWith(frost, grain, tumble, thickness, bulge, elevation, lightDegrees, transmission, seed)`.
+The palettes are `lagoon`, `lilac`, `rose`, `amber` and `mint`. Shapes are `rounded`, `capsule`,
+`disc` and `squircle`.
+
+For calm interfaces like the screens above, keep `transmission` and `elevation` low: the glass
+reads as frosted rather than glowing.
+
+`tumble` sets how far the outline wanders from a clean shape, like glass worn by the sea: 0 is a
+perfect shape and 0.065 is the most worn. `seed` picks which outline you get, so keep it fixed for a
+piece that should not change between rebuilds, and give neighbours different seeds so their
+outlines do not repeat.
+
+<p align="center"><img src="doc/screenshots/tumble_levels.png" width="260" alt="A Compose button and three discs, clean at tumble 0 and worn at tumble 0.065" /></p>
+
+## Shadows
+
+These are additions to the original. They only touch the ground light, which is the three blurred
+layers in `RealtimeGround`. The glass body itself is unchanged.
 
 - `shadowDegrees` controls where the cast shadow, contact shadow and transmitted colour pool go.
   180 is straight down, the default and the only direction in the original. 90 is right and 0 is
@@ -53,8 +78,8 @@ blurred layers in `RealtimeGround`. The glass body itself is unchanged.
   on photos). The transmitted colour pool is set separately by `transmission`.
 
 ```dart
-SeaGlassStyle.reference.copyWith(shadowDegrees: 135, shadowTinted: true)
-SeaGlassStyle.reference.copyWith(shadowColor: Colors.transparent, transmission: 0) // no ground light
+SeaGlassStyle.quiet.copyWith(shadowDegrees: 135, shadowTinted: true)
+SeaGlassStyle.quiet.copyWith(shadowColor: Colors.transparent, transmission: 0) // no ground light
 ```
 
 With the defaults (180 and untinted) the output matches the original. Every variant is checked
@@ -62,24 +87,6 @@ against the Kotlin exporter (`renderGroundExtended`), which applies the same cha
 original ground code path.
 
 <p align="center"><img src="doc/screenshots/shadow_directions.png" width="260" alt="Glass pieces with shadows in several directions, tinted, at 40% alpha and turned off" /></p>
-
-## Recipes and palettes
-
-Use `SeaGlassStyle.reference`, `tumbled` or `quiet`, or build your own with
-`copyWith(frost, grain, tumble, thickness, bulge, elevation, lightDegrees, transmission, seed)`.
-The palettes are `lagoon`, `lilac`, `rose`, `amber` and `mint`. Shapes are `rounded`, `capsule`,
-`disc` and `squircle`.
-
-`tumble` sets how far the outline wanders from a clean shape, like glass worn by the sea: 0 is a
-perfect shape and 0.065 is the most worn. `seed` picks which outline you get, so keep it fixed for a
-piece that should not change between rebuilds.
-
-<p align="center">
-  <img src="doc/screenshots/tumble_levels.png" width="260" alt="The same teal pill at tumble 0, 0.02, 0.04 and 0.065, from a clean capsule to a worn outline" />
-  <img src="doc/screenshots/tumble.gif" width="260" alt="Dragging the Tumble and Frost sliders reshapes glass buttons live" />
-</p>
-
-Keep a piece's `seed` stable. Give neighbours different seeds so their outlines do not repeat.
 
 ## Material 3 and dynamic colour
 
@@ -136,10 +143,11 @@ The material paints up to 48 px outside its layout box, so keep clipping ancesto
 
 ## Example
 
-`example/` has four tabs:
+`example/` has five tabs:
 
-- **Quick settings**: an Android-style panel with toggle tiles and a glass brightness slider.
-- **Pill**: one large glass pill.
+- **Music**: Sonder, a quiet player with a glass play button and controls.
+- **Mail**: Post, an inbox with a glass Inbox/Archive switch and Compose button.
+- **Nori**: a little conversation, with glass suggestion chips and a glass input.
 - **Playground**: recipes, palettes, Material 3 colours and live sliders.
 - **Promo**: a 10 second vertical loop.
 

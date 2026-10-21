@@ -12,12 +12,15 @@ dependencies:
     path: ../
 flutter:
   uses-material-design: true
-  assets:
-    - assets/gallery/
   fonts:
     - family: Google Sans
       fonts:
         - asset: assets/fonts/GoogleSans.ttf
+    - family: Newsreader
+      fonts:
+        - asset: assets/fonts/Newsreader.ttf
+        - asset: assets/fonts/Newsreader-Italic.ttf
+          style: italic
 dev_dependencies:
   flutter_test:
     sdk: flutter

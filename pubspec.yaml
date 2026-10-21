@@ -1,6 +1,6 @@
 name: sea_glass
 description: Sea glass for Flutter, frosted and softly tumbled, drawn with a real shader. Seeded outlines, frost, a glowing edge and transmitted light for Material 3 apps.
-version: 0.2.1
+version: 0.2.2
 homepage: https://github.com/ru-ji/sea_glass
 repository: https://github.com/ru-ji/sea_glass
 issue_tracker: https://github.com/ru-ji/sea_glass/issues
@@ -13,14 +13,16 @@ topics:
   - widget
 
 screenshots:
-  - description: Sea glass promo, action pills, toolbars, a composer on a photo, shadow direction and the API
+  - description: Sea glass promo, a music player, a mail inbox, a little conversation and the API
     path: doc/screenshots/promo.gif
-  - description: The tumble slider reshaping glass buttons live
-    path: doc/screenshots/tumble.gif
-  - description: Quick Settings panel made of frosted and teal sea glass tiles
-    path: doc/screenshots/quick_settings.png
-  - description: A teal glass pill with a glowing lower edge
-    path: doc/screenshots/pill.png
+  - description: Sonder, a music player with a mint sea glass play button and control bar
+    path: doc/screenshots/music.png
+  - description: Post, a mail inbox with a sea glass Inbox and Archive switch and Compose button
+    path: doc/screenshots/post.png
+  - description: Nori, a conversation with lilac sea glass suggestion chips and a frosted input
+    path: doc/screenshots/nori.png
+  - description: A Compose button and three discs, clean at tumble 0 and worn at tumble 0.065
+    path: doc/screenshots/tumble_levels.png
   - description: Glass pieces with shadows in several directions, tinted, faded and turned off
     path: doc/screenshots/shadow_directions.png
 

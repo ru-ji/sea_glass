@@ -3,11 +3,9 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:sea_glass/sea_glass.dart';
 
-import '../pages/messages_page.dart';
+import '../pages/everyday_pages.dart';
 import '../pages/pill_page.dart';
 import '../pages/quick_settings_page.dart';
-import '../pages/showcase_page.dart';
-import '../pages/toolbars_page.dart';
 
 /// Total length of the promo loop.
 const promoDuration = Duration(seconds: 10);
@@ -31,10 +29,9 @@ enum PromoClip {
 /// the empty background of the first, so the loop joins cleanly.
 ///
 /// 0.0-1.7   title, and a pill dropping into place
-/// 1.5-3.4   album action pills and a close button
-/// 3.3-5.2   a toolbar with a split button, an icon bar and a squircle
-/// 5.1-6.9   a message composer on a photo, with no shadow
-/// 6.8-8.7   the shadow turns (shadowDegrees), then fades out (shadowColor)
+/// 1.5-4.0   Sonder, the music player: play is pressed
+/// 3.9-6.4   Post, the mail inbox: Archive is selected
+/// 6.3-8.7   Nori, a little conversation
 /// 8.6-10.0  the one-line API, then fade out
 class PromoScene extends StatelessWidget {
   const PromoScene({super.key, required this.t, this.clip = PromoClip.release});
@@ -42,7 +39,8 @@ class PromoScene extends StatelessWidget {
   final double t;
   final PromoClip clip;
 
-  static const background = Color(0xFFEEF3F2);
+  // A shade darker than paper, so the phone cards stand out.
+  static const background = Color(0xFFEAE7DF);
   static const ink = Color(0xFF17302F);
 
   @override
@@ -78,18 +76,17 @@ class PromoScene extends StatelessWidget {
               ],
             _ => [ // full release
                 _scene(0.0, 1.7, (p) => _Title(t: t)),
-                _scene(1.5, 3.4, (p) => _Drop(t: t - 1.5, child: ShowcasePage.actions())),
-                _scene(3.3, 5.2, (p) => _Toolbars(t: t - 3.3)),
-                _scene(5.1, 6.9, (p) => _Drop(
-                    t: t - 5.1, child: SizedBox(width: 480, height: 320, child: MessagesPage.meadow()))),
-                _scene(6.8, 8.7, (p) => _ShadowFade(t: t - 6.8)),
+                _scene(1.5, 4.0, (p) => _Phone(
+                    t: t - 1.5, child: MusicPage(key: ValueKey(t >= 2.9), initiallyPlaying: t >= 2.9))),
+                _scene(3.9, 6.4, (p) => _Phone(
+                    t: t - 3.9, child: PostPage(key: ValueKey(t >= 5.7), initiallyArchive: t >= 5.7))),
+                _scene(6.3, 8.7, (p) => _Phone(t: t - 6.3, child: const NoriPage())),
                 _scene(8.6, 10.0, (p) => _Code(t: t)),
                 _caption(const [
                   (0.3, 1.6, 'Frosted, softly tumbled glass'),
-                  (1.7, 3.3, 'Buttons, pills and actions'),
-                  (3.5, 5.1, 'Toolbars and split buttons'),
-                  (5.3, 6.8, 'On photos, with the shadow off'),
-                  (7.0, 8.5, 'Choose where the shadow falls'),
+                  (1.7, 3.8, 'Music that feels calm'),
+                  (4.1, 6.2, 'Mail with room to breathe'),
+                  (6.5, 8.5, 'A little conversation'),
                   (8.8, 9.8, 'One widget.'),
                 ]),
               ],
@@ -153,11 +150,11 @@ class _Title extends StatelessWidget {
         opacity: title,
         child: Transform.translate(
           offset: Offset(0, (1 - title) * 16),
-          child: const Column(children: [
-            Text('INTRODUCING', style: TextStyle(fontSize: 13, letterSpacing: 4, fontWeight: FontWeight.w600)),
-            SizedBox(height: 10),
-            Text('sea_glass', style: TextStyle(fontSize: 52, fontWeight: FontWeight.w300, height: 1.05)),
-            Text('for Flutter', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w400)),
+          child: Column(children: [
+            const Text('INTRODUCING', style: TextStyle(fontSize: 13, letterSpacing: 4, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 12),
+            Text('Sea Glass', style: serif(54, height: 1.05)),
+            Text('for Flutter', style: serif(24, color: const Color(0xFF3B7D66), italic: true)),
           ]),
         ),
       ),
@@ -167,12 +164,14 @@ class _Title extends StatelessWidget {
         child: Transform.translate(
           offset: Offset(0, (1 - drop) * -70),
           child: const SeaGlassSurface(
-            width: 260,
-            height: 72,
+            width: 220,
+            height: 64,
             shape: SeaGlassShape.capsule,
-            palette: lagoonPill,
-            style: pillStyle,
-            child: Text('Sea Glass', style: TextStyle(fontSize: 26)),
+            palette: mint,
+            style: quietGlass,
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              Icon(Icons.play_arrow, size: 26), SizedBox(width: 8), Text('Listen', style: TextStyle(fontSize: 22)),
+            ]),
           ),
         ),
       ),
@@ -387,90 +386,42 @@ class _Shadow extends StatelessWidget {
   }
 }
 
-/// [child] drops in from above with a small overshoot. [t] starts at 0.
-class _Drop extends StatelessWidget {
-  const _Drop({required this.t, required this.child});
+/// A phone screen on a paper card that rises into place. [t] starts at 0.
+class _Phone extends StatelessWidget {
+  const _Phone({required this.t, required this.child});
   final double t;
   final Widget child;
 
   @override
   Widget build(BuildContext context) {
-    final drop = Curves.easeOutBack.transform(_progress(t, 0.05, 0.8));
-    return Center(
-      child: Transform.translate(
-        offset: Offset(0, (1 - drop) * -60 - 30),
-        child: FittedBox(child: Padding(padding: const EdgeInsets.all(24), child: child)),
+    final rise = _ease(_progress(t, 0, .6));
+    return Padding(
+      padding: const EdgeInsets.only(top: 26),
+      child: Align(
+        alignment: Alignment.topCenter,
+        child: Transform.translate(
+          offset: Offset(0, (1 - rise) * 30),
+          child: Container(
+            width: 226,
+            height: 226 * 891 / 411,
+            clipBehavior: Clip.antiAlias,
+            decoration: BoxDecoration(
+              color: paper,
+              borderRadius: BorderRadius.circular(26),
+              boxShadow: const [BoxShadow(color: Color(0x1F3B3426), blurRadius: 28, offset: Offset(0, 10))],
+            ),
+            child: FittedBox(
+              child: MediaQuery.removePadding(
+                context: context,
+                removeTop: true,
+                removeBottom: true,
+                child: SizedBox(width: 411, height: 891, child: child),
+              ),
+            ),
+          ),
+        ),
       ),
     );
-  }
-}
-
-/// The Reply-all toolbar, then the icon bar and squircle a beat later.
-class _Toolbars extends StatelessWidget {
-  const _Toolbars({required this.t});
-  final double t;
-
-  @override
-  Widget build(BuildContext context) {
-    Widget fit(Widget child, double start) {
-      final x = Curves.easeOutBack.transform(_progress(t, start, start + .7));
-      return Opacity(
-        opacity: _ease(_progress(t, start, start + .3)),
-        child: Transform.translate(
-          offset: Offset((1 - x) * 80, 0),
-          child: SizedBox(width: 352, child: FittedBox(child: Padding(padding: const EdgeInsets.all(12), child: child))),
-        ),
-      );
-    }
-
-    return Column(children: [
-      const Spacer(flex: 3),
-      fit(ToolbarsPage.replyBar(), 0.05),
-      const SizedBox(height: 28),
-      fit(ToolbarsPage.emojiBar(), 0.45),
-      const Spacer(flex: 4),
-    ]);
-  }
-}
-
-/// The shadow swings from 180 to 90 to 135 degrees, then its alpha fades to 0.
-class _ShadowFade extends StatelessWidget {
-  const _ShadowFade({required this.t});
-  final double t;
-
-  static const _going = SeaGlassPalette(body: Color(0xFF63B4F2), edge: Color(0xFFC4E8FF), ink: Color(0xFF0B3A6B));
-
-  @override
-  Widget build(BuildContext context) {
-    final turn = Curves.easeInOut.transform(_progress(t, 0.3, 0.9));
-    final settle = Curves.easeInOut.transform(_progress(t, 0.9, 1.25));
-    final degrees = (180 - 90 * turn + 45 * settle).roundToDouble();
-    // Steps of .1, so each alpha's ground light is rasterized only once.
-    final alpha = ((1 - _progress(t, 1.3, 1.7)) * 10).round() / 10;
-    return Column(children: [
-      const Spacer(flex: 3),
-      SeaGlassSurface(
-        width: 220,
-        height: 80,
-        shape: SeaGlassShape.capsule,
-        palette: _going,
-        style: pillStyle.copyWith(
-          shadowDegrees: degrees,
-          elevation: 18,
-          transmission: alpha * .55,
-          shadowColor: const Color(0xFF3F4342).withValues(alpha: alpha),
-        ),
-        child: const Row(mainAxisSize: MainAxisSize.min, children: [
-          Icon(Icons.check_circle, size: 28), SizedBox(width: 10), Text('Going', style: TextStyle(fontSize: 26)),
-        ]),
-      ),
-      const SizedBox(height: 70),
-      _CodeChip(lines: [
-        'shadowDegrees: ${degrees.toInt()}',
-        'shadowColor alpha: ${alpha.toStringAsFixed(1)}',
-      ]),
-      const Spacer(flex: 4),
-    ]);
   }
 }
 
@@ -536,9 +487,10 @@ class _Code extends StatelessWidget {
       Spacer(flex: 3),
       _CodeChip(lines: [
         'SeaGlassButton(',
-        '  onPressed: compose,',
-        '  palette: SeaGlassPalette.lagoon,',
-        "  child: Text('Compose'),",
+        '  onPressed: play,',
+        '  palette: SeaGlassPalette.mint,',
+        '  style: SeaGlassStyle.quiet,',
+        '  child: Icon(Icons.play_arrow),',
         ')',
       ]),
       SizedBox(height: 40),

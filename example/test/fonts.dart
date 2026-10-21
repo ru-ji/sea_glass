@@ -19,6 +19,7 @@ Future<void> loadFonts() async {
 
   await load('Roboto', [for (final w in ['Regular', 'Medium', 'Bold', 'Light']) '$fonts/Roboto-$w.ttf']);
   await load('Google Sans', ['assets/fonts/GoogleSans.ttf']);
+  await load('Newsreader', ['assets/fonts/Newsreader.ttf', 'assets/fonts/Newsreader-Italic.ttf']);
   await load('MaterialIcons', ['$fonts/MaterialIcons-Regular.otf']);
   await load('monospace', [
     '/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf',
