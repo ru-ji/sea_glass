@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 
 import 'pages/everyday_pages.dart';
-import 'pages/playground_page.dart';
-import 'promo/promo_scene.dart';
 
 void main() => runApp(const SeaGlassExampleApp());
 
@@ -21,13 +19,13 @@ class SeaGlassExampleApp extends StatelessWidget {
         useMaterial3: true,
         fontFamily: 'Google Sans',
         scaffoldBackgroundColor: paper,
-        navigationBarTheme: const NavigationBarThemeData(backgroundColor: paper),
       ),
       home: ExampleHome(initialPage: initialPage),
     );
   }
 }
 
+/// The three screens, full screen. Swipe to move between them.
 class ExampleHome extends StatefulWidget {
   const ExampleHome({super.key, this.initialPage = 0});
 
@@ -38,26 +36,20 @@ class ExampleHome extends StatefulWidget {
 }
 
 class _ExampleHomeState extends State<ExampleHome> {
-  late int page = widget.initialPage;
+  late final PageController controller = PageController(initialPage: widget.initialPage);
+
+  @override
+  void dispose() {
+    controller.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: IndexedStack(
-        index: page,
-        sizing: StackFit.expand,
-        children: const [MusicPage(), PostPage(), NoriPage(), PlaygroundPage(), PromoPage()],
-      ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: page,
-        onDestinationSelected: (i) => setState(() => page = i),
-        destinations: const [
-          NavigationDestination(icon: Icon(Icons.music_note_outlined), label: 'Music'),
-          NavigationDestination(icon: Icon(Icons.mail_outline), label: 'Mail'),
-          NavigationDestination(icon: Icon(Icons.auto_awesome_outlined), label: 'Nori'),
-          NavigationDestination(icon: Icon(Icons.science_outlined), label: 'Playground'),
-          NavigationDestination(icon: Icon(Icons.movie_outlined), label: 'Promo'),
-        ],
+      body: PageView(
+        controller: controller,
+        children: const [MusicPage(), PostPage(), NoriPage()],
       ),
     );
   }

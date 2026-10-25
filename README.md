@@ -141,23 +141,6 @@ pieces that repeat also draw straight away.
 
 The material paints up to 48 px outside its layout box, so keep clipping ancestors out of the way.
 
-## Example
-
-`example/` has five tabs:
-
-- **Music**: Sonder, a quiet player with a glass play button and controls.
-- **Mail**: Post, an inbox with a glass Inbox/Archive switch and Compose button.
-- **Nori**: a little conversation, with glass suggestion chips and a glass input.
-- **Playground**: recipes, palettes, Material 3 colours and live sliders.
-- **Promo**: a 10 second vertical loop.
-
-`example/test/promo_video_test.dart` renders the promo frame by frame with the real shader. Use
-ffmpeg on the frames to build `doc/promo/sea_glass_promo.mp4` (720 x 1280, 30 fps); set
-`PROMO_CLIP=button`, `screen` or `tumble` to render one of the shorter clips.
-
-`example/test/screenshot_test.dart` renders each page with the real shader and regenerates
-`doc/screenshots/`.
-
 ## License
 
 Apache 2.0. See [LICENSE](LICENSE).
