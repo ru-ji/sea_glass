@@ -332,3 +332,60 @@ GeometryTextures buildGeometryTextures(GeometryRequest r) {
   }
   return GeometryTextures(width, height, a, b, gradientScaleA, gradientScaleB);
 }
+
+/// [buildGeometryTextures] with both textures already rounded to binary16,
+/// so the rounding runs in the build isolate instead of on the UI thread.
+GeometryTextures buildUploadableGeometryTextures(GeometryRequest r) {
+  final t = buildGeometryTextures(r);
+  roundToHalf(t.a);
+  roundToHalf(t.b);
+  return t;
+}
+
+/// Rounds each value to IEEE binary16 in place and returns [data]. The
+/// original uploads RGBA_F16 on every platform, so the GPU must sample the
+/// same rounded texel values.
+Float32List roundToHalf(Float32List data) {
+  for (var i = 0; i < data.length; i++) {
+    data[i] = _halfToFloat[float16Bits(data[i])];
+  }
+  return data;
+}
+
+/// Every binary16 value as a float, built once per isolate.
+final Float32List _halfToFloat = Float32List.fromList(List.generate(65536, halfToFloat));
+
+final ByteData _bits = ByteData(4);
+
+/// IEEE binary16 with round-to-nearest-even (port of the original float16Bits).
+int float16Bits(double value) {
+  _bits.setFloat32(0, value);
+  final bits = _bits.getUint32(0);
+  final sign = (bits >>> 16) & 0x8000;
+  final exponent = (bits >>> 23) & 0xFF;
+  final mantissa = bits & 0x7FFFFF;
+  if (exponent == 0xFF) return sign | (mantissa == 0 ? 0x7C00 : 0x7E00);
+  final halfExponent = exponent - 127 + 15;
+  if (halfExponent >= 31) return sign | 0x7C00;
+  if (halfExponent <= 0) {
+    if (halfExponent < -10) return sign;
+    final significant = mantissa | 0x800000;
+    final shift = 14 - halfExponent;
+    var rounded = significant >>> shift;
+    final remainder = significant & ((1 << shift) - 1);
+    final halfway = 1 << (shift - 1);
+    if (remainder > halfway || (remainder == halfway && (rounded & 1) != 0)) rounded++;
+    return sign | rounded;
+  }
+  final rounded = mantissa + 0xFFF + ((mantissa >>> 13) & 1);
+  return sign | ((halfExponent << 10) + (rounded >>> 13));
+}
+
+double halfToFloat(int h) {
+  final sign = (h & 0x8000) != 0 ? -1.0 : 1.0;
+  final exponent = (h >>> 10) & 0x1F;
+  final mantissa = h & 0x3FF;
+  if (exponent == 0) return sign * mantissa * math.pow(2, -24);
+  if (exponent == 31) return mantissa == 0 ? sign * double.infinity : double.nan;
+  return sign * (1 + mantissa / 1024) * math.pow(2, exponent - 15);
+}

@@ -163,7 +163,12 @@ class SeaGlassGeometryController extends ChangeNotifier {
   /// matches the size, use its path; otherwise compute the requested one now.
   Path pathFor(Size size, SeaGlassShape shape, SeaGlassStyle style) {
     final d = _displayed;
-    if (d != null && d.key.sameSize(size)) return d.path;
+    if (d != null) {
+      if (d.key.sameSize(size)) return d.path;
+      // Match the painter, which stretches the last geometry while the next one builds.
+      return d.path.transform(Matrix4.diagonal3Values(
+          size.width / d.key.widthDp, size.height / d.key.heightDp, 1).storage);
+    }
     final key = keyFor(size, shape, style);
     if (_paths.length > 4) _paths.clear();
     return _paths[key] ??= _outline(key);
@@ -275,7 +280,7 @@ class SeaGlassGeometryController extends ChangeNotifier {
       final columns = width + 2, rows = height + 2;
       final coverage = await rasterizeMask(segments, columns, rows, k.fieldScale);
       final textures = await compute(
-        buildGeometryTextures,
+        buildUploadableGeometryTextures,
         GeometryRequest(
           widthDp: k.widthDp, heightDp: k.heightDp, scale: k.fieldScale,
           seed: k.seed, width: width, height: height, coverage: coverage,
@@ -352,6 +357,10 @@ class SeaGlassPainter extends CustomPainter {
   /// Pixel ratio used for the cached ground-light image.
   final double devicePixelRatio;
 
+  /// The ground light is blurred by at least 1.4 logical pixels, so more than
+  /// 1.5 image pixels per logical pixel only costs memory.
+  double get _groundRatio => math.min(devicePixelRatio, 1.5);
+
   @override
   void paint(Canvas canvas, Size size) {
     if (size.width < 1 || size.height < 1) return;
@@ -373,7 +382,7 @@ class SeaGlassPainter extends CustomPainter {
     final own = Size(geometry.key.widthDp, geometry.key.heightDp);
     canvas.save();
     if (exact == null) canvas.scale(size.width / own.width, size.height / own.height);
-    _drawGround(canvas, controller.groundFor(geometry.path, own, s, palette, devicePixelRatio), own);
+    _drawGround(canvas, controller.groundFor(geometry.path, own, s, palette, _groundRatio), own);
     _paintBody(canvas, s, geometry, p);
     canvas.restore();
   }
@@ -383,7 +392,7 @@ class SeaGlassPainter extends CustomPainter {
       image,
       Rect.fromLTWH(0, 0, image.width.toDouble(), image.height.toDouble()),
       Rect.fromLTWH(-kSeaGlassPadding, -kSeaGlassPadding,
-          image.width / devicePixelRatio, image.height / devicePixelRatio),
+          image.width / _groundRatio, image.height / _groundRatio),
       Paint()..filterQuality = FilterQuality.low,
     );
   }
@@ -404,7 +413,7 @@ class SeaGlassPainter extends CustomPainter {
 
   void _paintFlat(Canvas canvas, Size size, SeaGlassStyle s) {
     final path = controller.pathFor(size, shape, s);
-    paintGround(canvas, path, size, s, palette);
+    _drawGround(canvas, controller.groundFor(path, size, s, palette, _groundRatio), size);
     canvas.drawPath(path, Paint()
       ..isAntiAlias = true
       ..shader = ui.Gradient.linear(Offset.zero, Offset(0, size.height),
@@ -448,25 +457,22 @@ Future<Uint8List> rasterizeMask(List<ContourSegment> segments, int columns, int 
   picture.dispose();
   final rgba = (await image.toByteData(format: ui.ImageByteFormat.rawRgba))!;
   image.dispose();
+  final bytes = rgba.buffer.asUint8List(rgba.offsetInBytes, rgba.lengthInBytes);
   final coverage = Uint8List(columns * rows);
   for (var i = 0; i < coverage.length; i++) {
-    coverage[i] = rgba.getUint8(i * 4 + 3);
+    coverage[i] = bytes[i * 4 + 3];
   }
   return coverage;
 }
 
 /// Opaque float RGBA keeps the encoded fields away from colour conversion.
-/// Values are rounded to IEEE binary16 first, since the original uploads
-/// RGBA_F16 on every platform. The GPU then samples the same texel values.
+/// [data] must already be rounded with [roundToHalf].
 Future<ui.Image> uploadFloatTexture(Float32List data, int width, int height) {
-  final rounded = Float32List(data.length);
-  for (var i = 0; i < data.length; i++) {
-    rounded[i] = halfToFloat(float16Bits(data[i]));
-  }
   final done = Completer<ui.Image>();
   // Ask for a float texture explicitly. With the default (dontCare), a backend
   // may store 8-bit channels and quantize the encoded gradients.
-  ui.decodeImageFromPixels(rounded.buffer.asUint8List(), width, height, ui.PixelFormat.rgbaFloat32,
+  ui.decodeImageFromPixels(data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes), width, height,
+      ui.PixelFormat.rgbaFloat32,
       done.complete, targetFormat: ui.TargetPixelFormat.rgbaFloat32);
   return done.future;
 }
@@ -514,41 +520,6 @@ void configureBodyShader(
   f(((e >> 16) & 255) / 255); f(((e >> 8) & 255) / 255); f((e & 255) / 255); // edgeColor
   f(lx); f(ly); // lightDirection
   f(halfX / halfLength); f(halfY / halfLength); f(halfZ / halfLength); // halfway
-}
-
-final ByteData _bits = ByteData(4);
-
-/// IEEE binary16 with round-to-nearest-even (port of the original float16Bits).
-int float16Bits(double value) {
-  _bits.setFloat32(0, value);
-  final bits = _bits.getUint32(0);
-  final sign = (bits >>> 16) & 0x8000;
-  final exponent = (bits >>> 23) & 0xFF;
-  final mantissa = bits & 0x7FFFFF;
-  if (exponent == 0xFF) return sign | (mantissa == 0 ? 0x7C00 : 0x7E00);
-  final halfExponent = exponent - 127 + 15;
-  if (halfExponent >= 31) return sign | 0x7C00;
-  if (halfExponent <= 0) {
-    if (halfExponent < -10) return sign;
-    final significant = mantissa | 0x800000;
-    final shift = 14 - halfExponent;
-    var rounded = significant >>> shift;
-    final remainder = significant & ((1 << shift) - 1);
-    final halfway = 1 << (shift - 1);
-    if (remainder > halfway || (remainder == halfway && (rounded & 1) != 0)) rounded++;
-    return sign | rounded;
-  }
-  final rounded = mantissa + 0xFFF + ((mantissa >>> 13) & 1);
-  return sign | ((halfExponent << 10) + (rounded >>> 13));
-}
-
-double halfToFloat(int h) {
-  final sign = (h & 0x8000) != 0 ? -1.0 : 1.0;
-  final exponent = (h >>> 10) & 0x1F;
-  final mantissa = h & 0x3FF;
-  if (exponent == 0) return sign * mantissa * math.pow(2, -24);
-  if (exponent == 31) return mantissa == 0 ? sign * double.infinity : double.nan;
-  return sign * (1 + mantissa / 1024) * math.pow(2, exponent - 15);
 }
 
 /// Port of RealtimeGround. Draws the three layers in the original order, each

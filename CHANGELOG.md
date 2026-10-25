@@ -1,3 +1,7 @@
+## 0.2.3
+
+- Fixed dropped frames when building large pieces, made resize animations cheaper and reduced shadow memory.
+
 ## 0.2.2
 
 - Updated the docs, screenshots and promo, and refactored the example code.

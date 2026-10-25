@@ -146,8 +146,8 @@ void main() {
         expect(program, isNotNull, reason: 'shader must load in flutter test');
         final w = c.i('textureWidth'), h = c.i('textureHeight');
         final pixels = (await tester.runAsync(() async {
-          final a = await uploadFloatTexture(c.floats('a.f32'), w, h);
-          final b = await uploadFloatTexture(c.floats('b.f32'), w, h);
+          final a = await uploadFloatTexture(roundToHalf(c.floats('a.f32')), w, h);
+          final b = await uploadFloatTexture(roundToHalf(c.floats('b.f32')), w, h);
           return renderBody(c, a, b, f32(c.n('gradientScaleA')), f32(c.n('gradientScaleB')), program!);
         }))!;
         final (interior, all) = compareRgba(pixels, c.bytes('body.rgba'));
@@ -163,8 +163,8 @@ void main() {
         final program = await tester.runAsync(SeaGlassShaderProgram.load);
         final w = c.i('textureWidth'), h = c.i('textureHeight');
         final pixels = (await tester.runAsync(() async {
-          final a = await uploadFloatTexture(c.floats('a.f32'), w, h);
-          final b = await uploadFloatTexture(c.floats('b.f32'), w, h);
+          final a = await uploadFloatTexture(roundToHalf(c.floats('a.f32')), w, h);
+          final b = await uploadFloatTexture(roundToHalf(c.floats('b.f32')), w, h);
           return renderBody(c, a, b, f32(c.n('gradientScaleA')), f32(c.n('gradientScaleB')), program!, offset: offset);
         }))!;
         final pw = c.i('pixelWidth'), ph = c.i('pixelHeight'), stride = pw + offset.dx.toInt();
@@ -217,8 +217,8 @@ void main() {
             widthDp: c.n('width'), heightDp: c.n('height'), scale: c.fieldScale,
             seed: c.i('seed'), width: w, height: h, coverage: mask,
           ));
-          final a = await uploadFloatTexture(t.a, w, h);
-          final b = await uploadFloatTexture(t.b, w, h);
+          final a = await uploadFloatTexture(roundToHalf(t.a), w, h);
+          final b = await uploadFloatTexture(roundToHalf(t.b), w, h);
           return renderBody(c, a, b, t.gradientScaleA, t.gradientScaleB, program!);
         }))!;
         final (interior, all) = compareRgba(pixels, c.bytes('body.rgba'));
@@ -267,8 +267,8 @@ void main() {
       final w = c.i('textureWidth'), h = c.i('textureHeight');
       for (final (degrees, tinted) in variants) {
         final pixels = (await tester.runAsync(() async {
-          final a = await uploadFloatTexture(c.floats('a.f32'), w, h);
-          final b = await uploadFloatTexture(c.floats('b.f32'), w, h);
+          final a = await uploadFloatTexture(roundToHalf(c.floats('a.f32')), w, h);
+          final b = await uploadFloatTexture(roundToHalf(c.floats('b.f32')), w, h);
           return renderBody(c, a, b, f32(c.n('gradientScaleA')), f32(c.n('gradientScaleB')), program!,
               style: c.style.copyWith(shadowDegrees: degrees, shadowTinted: tinted));
         }))!;
