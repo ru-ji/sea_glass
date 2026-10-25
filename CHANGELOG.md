@@ -1,6 +1,7 @@
 ## 0.2.3
 
 - Fixed dropped frames when building large pieces, made resize animations cheaper and reduced shadow memory.
+- `SeaGlassButton` press offset now animates smoothly, and `pressOffset` sets its distance (0 turns it off).
 
 ## 0.2.2
 

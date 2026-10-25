@@ -158,7 +158,8 @@ class SeaGlassSurface extends StatelessWidget {
 }
 
 /// Glass button with button semantics, a 48 logical pixel minimum target,
-/// a keyboard focus outline, a disabled state and a 2 px press offset.
+/// a keyboard focus outline, a disabled state and an animated press offset
+/// ([pressOffset], 2 px by default).
 class SeaGlassButton extends StatefulWidget {
   const SeaGlassButton({
     super.key,
@@ -174,7 +175,12 @@ class SeaGlassButton extends StatefulWidget {
     this.semanticLabel,
     this.focusNode,
     this.autofocus = false,
+    this.pressOffset = 2,
   });
+
+  /// How far the piece moves down while pressed, in logical pixels.
+  /// 0 turns the effect off.
+  final double pressOffset;
 
   /// Null disables the button.
   final VoidCallback? onPressed;
@@ -213,7 +219,8 @@ class _SeaGlassButtonState extends State<SeaGlassButton> with _GlassState {
     final pressed = _pressed && _enabled;
     // Matches the original: content clipped to the outline, a 4 px centred
     // focus stroke clipped to a 2 px inner border, and the whole piece offset
-    // 2 px while pressed. Disabled pieces draw at 45% opacity.
+    // 2 px while pressed (eased here instead of jumping). Disabled pieces draw
+    // at 45% opacity.
     final clipper = SeaGlassClipper(cache, style, shape);
     Widget content = ClipPath(
       clipper: clipper,
@@ -256,8 +263,11 @@ class _SeaGlassButtonState extends State<SeaGlassButton> with _GlassState {
       constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
       child: SizedBox(width: widget.width, height: widget.height, child: glass),
     );
-    glass = Transform.translate(
-      offset: Offset(0, pressed ? 2 : 0),
+    glass = TweenAnimationBuilder<double>(
+      tween: Tween(end: pressed ? widget.pressOffset : 0),
+      duration: const Duration(milliseconds: 90),
+      curve: Curves.easeOut,
+      builder: (context, dy, child) => Transform.translate(offset: Offset(0, dy), child: child),
       child: Opacity(opacity: _enabled ? 1 : .45, child: glass),
     );
 
